@@ -667,6 +667,7 @@ xrun-ci: xrun-asm-tests xrun-amo-tests xrun-mul-tests xrun-fp-tests xrun-benchma
 
 # verilator-specific
 verilate_command := $(verilator) --no-timing verilator_config.vlt                                                \
+                    $(if $(COVERAGE),--coverage-line,)                                                           \
                     -f core/Flist.cva6                                                                           \
                     core/cva6_rvfi.sv                                                                            \
                     $(filter-out %.vhd, $(ariane_pkg))                                                           \

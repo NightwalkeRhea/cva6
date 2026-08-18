@@ -17,6 +17,9 @@
 
 #include "verilator.h"
 #include "verilated.h"
+#if VM_COVERAGE
+#include "verilated_cov.h"
+#endif
 #include "Variane_testharness.h"
 #if (VERILATOR_VERSION_INTEGER >= 5000000)
   // Verilator v5 adds $root wrapper that provides rootp pointer.
@@ -396,6 +399,13 @@ done_processing:
   } else {
     fprintf(stderr, "%s *** SUCCESS *** (tohost = 0) after %ld cycles\n", htif_argv[1], main_time);
   }
+
+#if VM_COVERAGE
+  const char* coverage_file = getenv("CVA6_COVERAGE_FILE");
+  if (!coverage_file || !coverage_file[0]) coverage_file = "coverage.dat";
+  VerilatedCov::write(coverage_file);
+  fprintf(stderr, "Wrote Verilator coverage: %s\n", coverage_file);
+#endif
 
   if (dtm) delete dtm;
   if (jtag) delete jtag;
