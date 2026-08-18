@@ -58,6 +58,10 @@ module alu
   logic [CVA6Cfg.XLEN-1:0] brev8_reversed;
   logic [            31:0] unzip_gen;
   logic [            31:0] zip_gen;
+
+  // Local directed fault-injection switch. Keep disabled for the golden run.
+  // When enabled, ADD(2, 3) result bit 0 is forced to zero (5 becomes 4).
+  localparam bit FI_ADD_2_PLUS_3_BIT0_SA0 = 1'b1;
   logic [CVA6Cfg.XLEN-1:0] xperm8_result;
   logic [CVA6Cfg.XLEN-1:0] xperm4_result;
 
@@ -408,6 +412,11 @@ module alu
         if (fu_data_i.operation == UNZIP) result_o = unzip_gen;
         if (fu_data_i.operation == ZIP) result_o = zip_gen;
       end
+    end
+
+    if (FI_ADD_2_PLUS_3_BIT0_SA0 && fu_data_i.operation == ADD &&
+        operand_a == CVA6Cfg.XLEN'(2) && operand_b == CVA6Cfg.XLEN'(3)) begin
+      result_o[0] = 1'b0;
     end
   end
 endmodule

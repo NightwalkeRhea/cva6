@@ -1,0 +1,14 @@
+Baseline CVA6 commit: a3dc2c5e7835b25dc8437eee3e956ab12857ead7
+Configuration: cv32a65x
+
+The branch golden-a3dc2c5e points exactly at this untouched commit.
+The branch local-fault-injection contains the directed ALU fault experiment.
+
+Return to the clean baseline:
+  git switch golden-a3dc2c5e
+
+Return to the experiment:
+  git switch local-fault-injection
+
+Return to whichever branch you were previously using:
+  git switch -
