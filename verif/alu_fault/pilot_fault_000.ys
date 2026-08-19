@@ -1,0 +1,18 @@
+read_json fi-results/milestone4c-synthesis/alu_cv32a65x_netlist.json
+
+hierarchy -check -top alu_cv32a65x_wrapper
+
+mutate -mode const0 \
+  -module alu_cv32a65x_wrapper \
+  -cell $abc$9576$auto$blifparse.cc:397:parse_blif$11419 \
+  -port Y \
+  -portbit 0
+
+opt_clean
+check
+
+write_verilog -noattr \
+  fi-results/milestone5a-mutants/fault_000.v
+
+write_json \
+  fi-results/milestone5a-mutants/fault_000.json
