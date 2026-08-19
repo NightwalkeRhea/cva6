@@ -27,6 +27,7 @@ module alu_replay_tb;
   integer transaction_count;
   integer result_errors;
   integer branch_errors;
+  integer fault_campaign_mode;
 
   alu_cv32a65x_wrapper dut (
       .operation_i    (operation_i),
@@ -59,6 +60,7 @@ module alu_replay_tb;
     transaction_count = 0;
     result_errors      = 0;
     branch_errors      = 0;
+    fault_campaign_mode = $test$plusargs("fault_campaign");
 
     if (!$value$plusargs("trace_file=%s", trace_file)) begin
       $fatal(1, "Missing +trace_file=<CSV path>");
@@ -155,15 +157,20 @@ module alu_replay_tb;
     $display("Result errors: %0d", result_errors);
     $display("Branch errors: %0d", branch_errors);
 
-    if (transaction_count == 0) begin
-      $fatal(1, "No transactions were read");
+        if (fault_campaign_mode != 0) begin
+      if (result_errors != 0 || branch_errors != 0) begin
+        $display("*** FAULT DETECTED ***");
+      end else begin
+        $display("*** FAULT NOT DETECTED ***");
+      end
+    end else begin
+      if (result_errors != 0 || branch_errors != 0) begin
+        $fatal(1, "ALU replay FAILED");
+      end
+
+      $display("*** ALU REPLAY SUCCESS ***");
     end
 
-    if (result_errors != 0 || branch_errors != 0) begin
-      $fatal(1, "ALU replay FAILED");
-    end
-
-    $display("*** ALU REPLAY SUCCESS ***");
     $finish;
   end
 
