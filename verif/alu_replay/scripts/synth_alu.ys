@@ -1,0 +1,39 @@
+# Load the SystemVerilog/slang frontend.
+plugin -i slang
+
+# Read packages in dependency order, then the ALU and its wrapper.
+read_slang \
+  --std 1800-2017 \
+  --top alu_cv32a65x_wrapper \
+  --ignore-assertions \
+  core/include/config_pkg.sv \
+  core/include/cv32a65x_config_pkg.sv \
+  core/include/riscv_pkg.sv \
+  core/include/ariane_pkg.sv \
+  core/include/build_config_pkg.sv \
+  vendor/pulp-platform/common_cells/src/cf_math_pkg.sv \
+  vendor/pulp-platform/common_cells/src/lzc.sv \
+  vendor/pulp-platform/common_cells/src/popcount.sv \
+  core/alu.sv \
+  verif/alu_replay/rtl/alu_cv32a65x_wrapper.sv
+
+# Confirm and elaborate the intended top-level design.
+hierarchy -check -top alu_cv32a65x_wrapper
+
+# Convert behavioral processes into netlist logic.
+proc
+opt
+
+# Remove the wrapper/ALU hierarchy for later fault injection.
+flatten
+opt
+
+# Perform generic logic synthesis.
+synth -top alu_cv32a65x_wrapper
+
+# Save statistics and the synthesized Verilog netlist.
+stat
+write_verilog -noattr fi-results/milestone4c-synthesis/alu_cv32a65x_netlist.v
+
+# Save a machine-readable design representation.
+write_json fi-results/milestone4c-synthesis/alu_cv32a65x_netlist.json
