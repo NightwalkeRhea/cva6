@@ -331,10 +331,13 @@ module ex_stage
   alu_wrapper #(
       .CVA6Cfg  (CVA6Cfg),
       .fu_data_t(fu_data_t)
-  ) alu_wrapper_i (
+    ) alu_wrapper_i (
       .clk_i,
       .rst_ni,
       .alu_bypass_i    (alu_bypass_i),
+      .alu_valid_i     (alu_valid_i),
+      .alu2_valid_i    (alu2_valid_i),
+      .branch_valid_i  (branch_valid_i),
       .fu_data_i       (alu_data),
       .result_o        (alu_result),
       .alu_branch_res_o(alu_branch_res)
