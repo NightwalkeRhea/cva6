@@ -1,0 +1,19 @@
+read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_monitor.sv
+
+# Keep only the standalone research monitor in this synthesis boundary.
+hierarchy -check -top dependency_feedback_monitor
+
+# Lower behavioral counters and sticky state into ordinary logic and flops.
+proc
+opt
+flatten
+opt
+synth -top dependency_feedback_monitor
+
+# Reject undriven wires, accidental latches, and other structural mistakes.
+stat
+check
+
+# Preserve both human-readable and machine-readable netlists for replay.
+write_verilog -noattr fi-results/milestone8d-synthesis/dependency_feedback_monitor_netlist.v
+write_json fi-results/milestone8d-synthesis/dependency_feedback_monitor_netlist.json
