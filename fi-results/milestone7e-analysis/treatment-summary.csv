@@ -1,0 +1,5 @@
+treatment,detected_faults,undetected_faults,coverage_percent,exclusive_faults
+independent,26,64,28.89,0
+load_use,47,43,52.22,20
+same_cycle_bypass,26,64,28.89,0
+scoreboard_forward,52,38,57.78,24

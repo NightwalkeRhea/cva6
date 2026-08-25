@@ -1,0 +1,218 @@
+
+-- Executing script file `verif/dependency_fault/scripts/check_raw_checker_equivalence.ys' --
+
+1. Executing Verilog-2005 frontend: verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv
+Parsing SystemVerilog input from `verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv' to AST representation.
+Generating RTLIL representation for module `\raw_checker_cv32a65x_wrapper'.
+Successfully finished Verilog frontend.
+
+2. Executing HIERARCHY pass (managing design hierarchy).
+
+2.1. Analyzing design hierarchy..
+Top module:  \raw_checker_cv32a65x_wrapper
+
+2.2. Analyzing design hierarchy..
+Top module:  \raw_checker_cv32a65x_wrapper
+Removed 0 unused modules.
+
+3. Executing PROC pass (convert processes to netlists).
+
+3.1. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Cleaned up 0 empty switches.
+
+3.2. Executing PROC_RMDEAD pass (remove dead branches from decision trees).
+Marked 16 switch rules as full_case in process $proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4 in module raw_checker_cv32a65x_wrapper.
+Removed a total of 0 dead cases.
+
+3.3. Executing PROC_PRUNE pass (remove redundant assignments in processes).
+Removed 0 redundant assignments.
+Promoted 3 assignments to connections.
+
+3.4. Executing PROC_INIT pass (extract init attributes).
+
+3.5. Executing PROC_ARST pass (detect async resets in processes).
+
+3.6. Executing PROC_ROM pass (convert switches to ROMs).
+Converted 0 switches.
+<suppressed ~16 debug messages>
+
+3.7. Executing PROC_MUX pass (convert decision trees to multiplexers).
+Creating decoders for process `\raw_checker_cv32a65x_wrapper.$proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4'.
+     1/16: $8\last_after_idx[2:0]
+     2/16: $8\last_before_idx[2:0]
+     3/16: $7\last_after_idx[2:0]
+     4/16: $7\last_before_idx[2:0]
+     5/16: $6\last_after_idx[2:0]
+     6/16: $6\last_before_idx[2:0]
+     7/16: $5\last_after_idx[2:0]
+     8/16: $5\last_before_idx[2:0]
+     9/16: $4\last_after_idx[2:0]
+    10/16: $4\last_before_idx[2:0]
+    11/16: $3\last_after_idx[2:0]
+    12/16: $3\last_before_idx[2:0]
+    13/16: $2\last_after_idx[2:0]
+    14/16: $2\last_before_idx[2:0]
+    15/16: $1\last_after_idx[2:0]
+    16/16: $1\last_before_idx[2:0]
+
+3.8. Executing PROC_DLATCH pass (convert process syncs to latches).
+No latch inferred for signal `\raw_checker_cv32a65x_wrapper.\last_before_idx' from process `\raw_checker_cv32a65x_wrapper.$proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4'.
+No latch inferred for signal `\raw_checker_cv32a65x_wrapper.\last_after_idx' from process `\raw_checker_cv32a65x_wrapper.$proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4'.
+
+3.9. Executing PROC_DFF pass (convert process syncs to FFs).
+
+3.10. Executing PROC_MEMWR pass (convert process memory writes to cells).
+
+3.11. Executing PROC_CLEAN pass (remove empty switches from decision trees).
+Found and cleaned up 16 empty switches in `\raw_checker_cv32a65x_wrapper.$proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4'.
+Removing empty process `raw_checker_cv32a65x_wrapper.$proc$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:30$4'.
+Cleaned up 16 empty switches.
+
+3.12. Executing OPT_EXPR pass (perform const folding).
+Optimizing module raw_checker_cv32a65x_wrapper.
+<suppressed ~1 debug messages>
+
+4. Executing FLATTEN pass (flatten design).
+
+5. Executing OPT pass (performing simple optimizations).
+
+5.1. Executing OPT_EXPR pass (perform const folding).
+Optimizing module raw_checker_cv32a65x_wrapper.
+
+5.2. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\raw_checker_cv32a65x_wrapper'.
+Computing hashes of 86 cells of `\raw_checker_cv32a65x_wrapper'.
+Finding duplicate cells in `\raw_checker_cv32a65x_wrapper'.
+Removed a total of 0 cells.
+
+5.3. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \raw_checker_cv32a65x_wrapper..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Removed 0 multiplexer ports.
+<suppressed ~16 debug messages>
+
+5.4. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \raw_checker_cv32a65x_wrapper.
+Performed a total of 0 changes.
+
+5.5. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\raw_checker_cv32a65x_wrapper'.
+Computing hashes of 86 cells of `\raw_checker_cv32a65x_wrapper'.
+Finding duplicate cells in `\raw_checker_cv32a65x_wrapper'.
+Removed a total of 0 cells.
+
+5.6. Executing OPT_DFF pass (perform DFF optimizations).
+
+5.7. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \raw_checker_cv32a65x_wrapper..
+Removed 2 unused cells and 63 unused wires.
+<suppressed ~3 debug messages>
+
+5.8. Executing OPT_EXPR pass (perform const folding).
+Optimizing module raw_checker_cv32a65x_wrapper.
+
+5.9. Rerunning OPT passes. (Maybe there is more to do..)
+
+5.10. Executing OPT_MUXTREE pass (detect dead branches in mux trees).
+Running muxtree optimizer on module \raw_checker_cv32a65x_wrapper..
+  Creating internal representation of mux trees.
+  Evaluating internal representation of mux trees.
+  Analyzing evaluation results.
+Removed 0 multiplexer ports.
+<suppressed ~16 debug messages>
+
+5.11. Executing OPT_REDUCE pass (consolidate $*mux and $reduce_* inputs).
+  Optimizing cells in module \raw_checker_cv32a65x_wrapper.
+Performed a total of 0 changes.
+
+5.12. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\raw_checker_cv32a65x_wrapper'.
+Computing hashes of 84 cells of `\raw_checker_cv32a65x_wrapper'.
+Finding duplicate cells in `\raw_checker_cv32a65x_wrapper'.
+Removed a total of 0 cells.
+
+5.13. Executing OPT_DFF pass (perform DFF optimizations).
+
+5.14. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \raw_checker_cv32a65x_wrapper..
+
+5.15. Executing OPT_EXPR pass (perform const folding).
+Optimizing module raw_checker_cv32a65x_wrapper.
+
+5.16. Finished fast OPT passes. (There is nothing left to do.)
+Renaming module \raw_checker_cv32a65x_wrapper to \gold.
+
+6. Executing JSON frontend.
+Importing module raw_checker_cv32a65x_wrapper from JSON tree.
+Renaming module \raw_checker_cv32a65x_wrapper to \gate.
+
+7. Executing EQUIV_MAKE pass (creating equiv checking module).
+Presumably equivalent wires: same_rd_as_rs_after_gold (\same_rd_as_rs_after_gold), same_rd_as_rs_after_gate ({ \same_rd_as_rs_after_gate [7:1] 1'x }) -> same_rd_as_rs_after
+  Skipping signal bit same_rd_as_rs_after_gold [0]: undriven on gold side.
+  Skipping signal bit same_rd_as_rs_after_gate [1]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [2]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [3]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [4]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [5]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [6]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_after_gate [7]: undriven on gate side.
+Presumably equivalent wires: same_rd_as_rs_before_gold (\same_rd_as_rs_before_gold), same_rd_as_rs_before_gate ({ 1'0 \same_rd_as_rs_before_gate [6:0] }) -> same_rd_as_rs_before
+  Skipping signal bit same_rd_as_rs_before_gate [0]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [1]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [2]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [3]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [4]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [5]: undriven on gate side.
+  Skipping signal bit same_rd_as_rs_before_gate [6]: undriven on gate side.
+Presumably equivalent wires: dependency_valid_o_gold (\dependency_valid_o_gold), dependency_valid_o_gate (\dependency_valid_o_gate) -> dependency_valid_o
+Presumably equivalent wires: producer_idx_o_gold (\producer_idx_o_gold), producer_idx_o_gate (\producer_idx_o_gate) -> producer_idx_o
+Presumably equivalent wires: issue_pointer_i_gold (\issue_pointer_i_gold), issue_pointer_i_gate (\issue_pointer_i_gate) -> issue_pointer_i
+Presumably equivalent wires: still_issued_i_gold (\still_issued_i_gold), still_issued_i_gate (\still_issued_i_gate) -> still_issued_i
+Presumably equivalent wires: rd_fpr_i_gold (\rd_fpr_i_gold), rd_fpr_i_gate (\rd_fpr_i_gate) -> rd_fpr_i
+Presumably equivalent wires: rd_flat_i_gold (\rd_flat_i_gold), rd_flat_i_gate (\rd_flat_i_gate) -> rd_flat_i
+Presumably equivalent wires: rs_fpr_i_gold (\rs_fpr_i_gold), rs_fpr_i_gate (\rs_fpr_i_gate) -> rs_fpr_i
+Presumably equivalent wires: rs_i_gold (\rs_i_gold), rs_i_gate (\rs_i_gate) -> rs_i
+Changing input S of cell $procmux$82_gold ($mux): \same_rd_as_rs_before_gold [7] -> \same_rd_as_rs_before [7]
+Changing input A of cell $reduce_or$verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv:39$6_gold ($reduce_or): \same_rd_as_rs_before_gold -> { \same_rd_as_rs_before [7] \same_rd_as_rs_before_gold [6:0] }
+Setting undriven nets to undef: \same_rd_as_rs_before [6:0]
+Setting undriven nets to undef: \same_rd_as_rs_after
+Setting undriven nets to undef: \same_rd_as_rs_after_gold [0]
+Setting undriven nets to undef: \same_rd_as_rs_before_gate [6:0]
+Setting undriven nets to undef: \same_rd_as_rs_after_gate [7:1]
+
+8. Executing HIERARCHY pass (managing design hierarchy).
+
+8.1. Analyzing design hierarchy..
+Top module:  \equiv
+
+8.2. Analyzing design hierarchy..
+Top module:  \equiv
+Removing unused module `\gate'.
+Removing unused module `\gold'.
+Removed 2 unused modules.
+
+9. Executing EQUIV_SIMPLE pass.
+Found 5 unproven $equiv cells (3 groups) in equiv:
+ Grouping SAT models for \producer_idx_o:
+  Trying to prove $equiv for \producer_idx_o [0]:ezsat
+ success!
+  Trying to prove $equiv for \producer_idx_o [1]:ezsat
+ success!
+  Trying to prove $equiv for \producer_idx_o [2]:ezsat
+ success!
+  Trying to prove $equiv for \dependency_valid_o:ezsat
+ success!
+  Trying to prove $equiv for \same_rd_as_rs_before [7]:ezsat
+ success!
+Proved 5 previously unproven $equiv cells.
+
+10. Executing EQUIV_STATUS pass.
+Found 5 $equiv cells in equiv:
+  Of those cells 5 are proven and 0 are unproven.
+  Equivalence successfully proven!
+
+End of script. Logfile hash: 8d2363190d, time: 0.08s, user: 0.08s, system: 0.00s, MEM: 21.67 MB peak
+Yosys 0.67+94 (git sha1 7defa5186-dirty, Release, Clang /usr/bin/clang++ 18.1.8)
+Time spent: 83% 1x equiv_simple (0 sec), 3% 2x read_json (0 sec), ...

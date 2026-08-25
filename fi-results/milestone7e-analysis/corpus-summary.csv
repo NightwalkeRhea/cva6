@@ -1,0 +1,2 @@
+total_faults,detected_faults,undetected_faults,coverage_percent,trace_fault_pairs,infrastructure_errors
+90,72,18,80.00,360,0

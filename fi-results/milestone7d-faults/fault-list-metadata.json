@@ -1,0 +1,34 @@
+{
+  "netlist": "/home/nightwalkerhea/testingResearch/ricerca/cva6/fi-results/milestone7d-synthesis/raw_checker_cv32a65x_netlist.json",
+  "netlist_sha256": "2563f4883c05985e06ff8ad096127a5e278eb66752b3b3cd947a4bdd9dbd3eae",
+  "top": "raw_checker_cv32a65x_wrapper",
+  "yosys_version": "Yosys 0.67+94 (git sha1 7defa5186-dirty, Release, Clang /usr/bin/clang++ 18.1.8)",
+  "seed": 20260825,
+  "per_mode": 30,
+  "total_selected": 90,
+  "scope": "internal cell-output bits",
+  "excluded_outputs": [
+    "producer_idx_o",
+    "dependency_valid_o"
+  ],
+  "modes": {
+    "const0": {
+      "candidate_seed": 20260825,
+      "raw_candidates": 220,
+      "internal_candidates": 216,
+      "selected": 30
+    },
+    "const1": {
+      "candidate_seed": 20260826,
+      "raw_candidates": 220,
+      "internal_candidates": 216,
+      "selected": 30
+    },
+    "inv": {
+      "candidate_seed": 20260827,
+      "raw_candidates": 220,
+      "internal_candidates": 216,
+      "selected": 30
+    }
+  }
+}

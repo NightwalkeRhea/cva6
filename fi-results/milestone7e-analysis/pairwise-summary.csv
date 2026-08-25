@@ -1,0 +1,7 @@
+treatment_a,treatment_b,faults_in_a_not_b,faults_in_b_not_a,faults_detected_by_both
+independent,load_use,1,22,25
+independent,same_cycle_bypass,0,0,26
+independent,scoreboard_forward,0,26,26
+load_use,same_cycle_bypass,22,1,25
+load_use,scoreboard_forward,20,25,27
+same_cycle_bypass,scoreboard_forward,0,26,26
