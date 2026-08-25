@@ -32,7 +32,9 @@ module raw_checker
     // Index in the scoreboard of the most recent RAW dependency - SCOREBOARD
     output logic [CVA6Cfg.TRANS_ID_BITS-1:0] idx_o,
     // Indicates if there is a RAW dependency - SCOREBOARD
-    output logic valid_o
+    output logic valid_o,
+    // All matching entries are useful research context before newest selection.
+    output logic [CVA6Cfg.NR_SB_ENTRIES-1:0] matches_o
 );
 
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0] same_rd_as_rs;
@@ -69,5 +71,8 @@ module raw_checker
 
   assign rs_is_gpr0 = (rs_i == '0) && !rs_fpr_i;
   assign valid_o = |same_rd_as_rs && !rs_is_gpr0;
+
+  // Suppress x0 exactly as valid_o does, so multiplicity cannot see false x0 matches.
+  assign matches_o = same_rd_as_rs & {CVA6Cfg.NR_SB_ENTRIES{!rs_is_gpr0}};
 
 endmodule

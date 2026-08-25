@@ -34,11 +34,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("trace", type=Path)
     parser.add_argument("--variant", choices=("8", "5", "4"), default="8")
+    parser.add_argument("--pc-start", type=lambda value: int(value, 0))
+    parser.add_argument("--pc-end", type=lambda value: int(value, 0))
     args = parser.parse_args()
     bitmap = 0
 
     with args.trace.open(newline="") as source:
         for row in csv.DictReader(source):
+            # Match the optional half-open payload window used by full-core runs.
+            pc = int(row["pc"], 16)
+            if args.pc_start is not None and pc < args.pc_start:
+                continue
+            if args.pc_end is not None and pc >= args.pc_end:
+                continue
             # Skip operands that do not participate in this issue attempt.
             if not int(row["operand_used"]):
                 continue

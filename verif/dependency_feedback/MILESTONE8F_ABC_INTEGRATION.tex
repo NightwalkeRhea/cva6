@@ -1,0 +1,101 @@
+\subsection{Milestone 8F: Integration of the dependency-feedback monitor}
+
+\subsubsection*{Milestone 8F-A: Signal and qualification boundary}
+
+I integrated the selected five-bit monitor beside the official RAW dependency
+checkers in \texttt{issue\_read\_operands.sv}. The monitor reuses the RAW-valid
+decision, the complete matching-entry vector, the selected producer index, the
+scoreboard issue pointer, and the live-entry vector already computed by CVA6.
+
+I qualified every observation so that the monitor accepts only a real source
+operand from a valid instruction inside the selected payload. Flushed and
+exception-bearing instructions are rejected. RS1 is rejected when it is
+replaced by a Z-immediate, and RS2 is rejected when the final operand mux
+replaces it with an ordinary immediate. A stalled valid consumer is still
+observed because an unresolved dependency is part of the internal behavior I
+want to describe.
+
+This exposed and corrected a limitation in my earlier replay traces. They had
+marked every RS2 checker invocation as a used operand. In the ten new full-core
+traces, 9433 unused RS2 rows were identified and excluded from feedback.
+
+\subsubsection*{Milestone 8F-B: RTL integration}
+
+I added the parameterized monitor to:
+
+\begin{verbatim}
+core/dependency_feedback_monitor.sv
+\end{verbatim}
+
+The monitor receives two source-operand observations per CVA6 issue port.
+Events occurring simultaneously are combined before updating one five-bit
+sticky bitmap. The RAW checker now exports its existing internal match vector,
+so I did not duplicate the register-comparison logic only for the monitor.
+
+The integrated CVA6 design compiled successfully with the project-pinned
+Verilator 5.008. The monitor does not feed any instruction, forwarding, stall,
+or architectural-state signal. As a non-interference check, the retired-
+instruction log of \texttt{independent} remained byte-for-byte identical to its
+pre-integration golden log. Both logs contained 1556 lines.
+
+\subsubsection*{Milestone 8F-C: Verilator feedback readout}
+
+The Verilator run accepts the following options:
+
+\begin{verbatim}
++dependency_feedback_file=<output.csv>
++dependency_feedback_pc_start=<payload start address>
++dependency_feedback_pc_end=<payload end address>
+\end{verbatim}
+
+The PC interval is half-open. I obtain its addresses from the ELF symbols
+\texttt{dependency\_payload\_start} and
+\texttt{dependency\_payload\_end}. The feedback file contains the initial zero
+and only subsequent changes of the sticky bitmap. Its last row is therefore the
+final summary of the generated payload.
+
+I first tested the monitor without a payload window. All ten programs produced
+\texttt{0x1f}. This happened because the common startup, trap, and exit code
+saturated the small bitmap before the differences between payloads could be
+used. This result showed that the measurement window is a necessary part of the
+feedback definition.
+
+After restricting the monitor to the generated payload, all ten programs
+passed and the integrated results matched the independent Python model:
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+Program & Integrated & Offline & Result \\
+\hline
+\texttt{independent}               & \texttt{0x00} & \texttt{0x00} & MATCH \\
+\texttt{load\_use}                 & \texttt{0x19} & \texttt{0x19} & MATCH \\
+\texttt{same\_cycle\_bypass}      & \texttt{0x00} & \texttt{0x00} & MATCH \\
+\texttt{scoreboard\_forward}      & \texttt{0x09} & \texttt{0x09} & MATCH \\
+\texttt{newest\_producer\_control}& \texttt{0x19} & \texttt{0x19} & MATCH \\
+\texttt{older\_producer}          & \texttt{0x1d} & \texttt{0x1d} & MATCH \\
+\texttt{single\_producer\_control}& \texttt{0x1d} & \texttt{0x1d} & MATCH \\
+\texttt{multiple\_producers}      & \texttt{0x1f} & \texttt{0x1f} & MATCH \\
+\texttt{wrap\_pair\_early}       & \texttt{0x0b} & \texttt{0x0b} & MATCH \\
+\texttt{wrap\_pair\_wrapped}     & \texttt{0x05} & \texttt{0x05} & MATCH \\
+\hline
+\end{tabular}
+\end{center}
+
+The corrected \texttt{scoreboard\_forward} result is \texttt{0x09}, rather
+than the previous \texttt{0x0f}, because unused RS2 fields no longer generate
+false wrapped and non-wrapped events. The corpus still produces seven distinct
+five-bit summaries, so this correction removes false information without
+reducing the observed treatment separation.
+
+\subsubsection*{Result}
+
+Milestones 8F-A, 8F-B, and 8F-C show that the selected five-bit feedback can be
+computed inside the real CVA6 dependency-resolution logic and exported through
+the official Verilator flow without changing retired execution. They also show
+that compact feedback must describe the generated payload, not the common
+runtime surrounding it.
+
+The next step is to measure the incremental synthesis cost of the integrated
+multi-operand cone and then use this five-bit value in a controlled MicroGP
+experiment against a software-only baseline.

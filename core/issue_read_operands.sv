@@ -190,6 +190,22 @@ module issue_read_operands
   logic [ CVA6Cfg.NrIssuePorts-1:0]                                rs3_fpr;
   logic [ CVA6Cfg.NrIssuePorts-1:0]                                rs3_gpr_cvxif;
 
+  // The research monitor observes RS1 and RS2 independently on every issue port.
+  localparam int unsigned DEPENDENCY_FEEDBACK_OBSERVATIONS = 2 * CVA6Cfg.NrIssuePorts;
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.NR_SB_ENTRIES-1:0] raw_matches_rs1;
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.NR_SB_ENTRIES-1:0] raw_matches_rs2;
+  logic [DEPENDENCY_FEEDBACK_OBSERVATIONS-1:0] dependency_feedback_sample_valid;
+  logic [DEPENDENCY_FEEDBACK_OBSERVATIONS-1:0] dependency_feedback_raw_valid;
+  logic [DEPENDENCY_FEEDBACK_OBSERVATIONS-1:0][CVA6Cfg.NR_SB_ENTRIES-1:0]
+      dependency_feedback_raw_matches;
+  logic [DEPENDENCY_FEEDBACK_OBSERVATIONS-1:0][CVA6Cfg.TRANS_ID_BITS-1:0]
+      dependency_feedback_producer_idx;
+  logic [CVA6Cfg.NrIssuePorts-1:0] rs2_operand_used;
+  logic [CVA6Cfg.NrIssuePorts-1:0] dependency_feedback_pc_eligible;
+  logic [CVA6Cfg.VLEN-1:0] dependency_feedback_pc_start;
+  logic [CVA6Cfg.VLEN-1:0] dependency_feedback_pc_end;
+  (* keep *) logic [4:0] dependency_feedback;
+
 
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0][ariane_pkg::REG_ADDR_SIZE-1:0] rd_list;
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0]                                rd_fpr;
@@ -223,21 +239,32 @@ module issue_read_operands
     // 9=PC, 10=ZIMM, 11=IMMEDIATE.
     integer dependency_trace_fd;
     integer raw_checker_trace_fd;
+    integer dependency_feedback_fd;
     longint unsigned dependency_trace_cycle;
     string dependency_trace_file;
     string raw_checker_trace_file;
+    string dependency_feedback_file;
     logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs1_source;
     logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs2_source;
     logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs1;
     logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs2;
     logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs1_forward_consumed;
     logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs2_forward_consumed;
+    logic [4:0] dependency_feedback_reported;
     logic [CVA6Cfg.NR_SB_ENTRIES*ariane_pkg::REG_ADDR_SIZE-1:0]
         raw_checker_rd_flat;
 
     initial begin
       dependency_trace_fd = 0;
       raw_checker_trace_fd = 0;
+      dependency_feedback_fd = 0;
+      // By default observe the whole execution; research runs can select payload PCs.
+      dependency_feedback_pc_start = '0;
+      dependency_feedback_pc_end = '1;
+      void'($value$plusargs("dependency_feedback_pc_start=%h",
+                            dependency_feedback_pc_start));
+      void'($value$plusargs("dependency_feedback_pc_end=%h",
+                            dependency_feedback_pc_end));
       dependency_trace_cycle = 0;
 
       if ($value$plusargs("dependency_trace_file=%s", dependency_trace_file)) begin
@@ -261,13 +288,34 @@ module issue_read_operands
             "cycle,issue_port,operand,pc,rs,rs_fpr,rd_flat,rd_fpr,still_issued,issue_pointer,expected_idx,expected_valid,operand_used"
         );
       end
+
+      // A separate tiny file is easier for MicroGP tooling to consume than a trace.
+      if ($value$plusargs("dependency_feedback_file=%s", dependency_feedback_file)) begin
+        dependency_feedback_fd = $fopen(dependency_feedback_file, "w");
+        if (dependency_feedback_fd == 0) begin
+          $fatal(1, "Cannot open dependency feedback file: %s", dependency_feedback_file);
+        end
+        // The first row makes an all-zero execution observable too.
+        $fdisplay(dependency_feedback_fd, "cycle,dependency_feedback");
+        $fdisplay(dependency_feedback_fd, "0,0x00");
+      end
     end
 
     always_ff @(posedge clk_i or negedge rst_ni) begin
       if (!rst_ni) begin
         dependency_trace_cycle <= 0;
+        dependency_feedback_reported <= '0;
       end else begin
         dependency_trace_cycle <= dependency_trace_cycle + 1;
+        if (dependency_feedback_fd != 0 &&
+            dependency_feedback != dependency_feedback_reported) begin
+          // Sticky bits change at most five times, so this is a compact stream.
+          $fdisplay(dependency_feedback_fd, "%0d,0x%0h",
+                    dependency_trace_cycle, dependency_feedback);
+          $fflush(dependency_feedback_fd);
+          $display("DEPENDENCY_FEEDBACK 0x%0h", dependency_feedback);
+          dependency_feedback_reported <= dependency_feedback;
+        end
       end
     end
   `endif
@@ -553,7 +601,8 @@ module issue_read_operands
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs1[i]),
-        .valid_o(rs1_raw_check[i])
+        .valid_o(rs1_raw_check[i]),
+        .matches_o(raw_matches_rs1[i])
     );
     assign rs1_has_raw[i] = rs1_raw_check[i] && !issue_instr_i[i].use_zimm;
 
@@ -569,7 +618,8 @@ module issue_read_operands
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs2[i]),
-        .valid_o(rs2_raw_check[i])
+        .valid_o(rs2_raw_check[i]),
+        .matches_o(raw_matches_rs2[i])
     );
     assign rs2_has_raw[i] = rs2_raw_check[i];
 
@@ -585,10 +635,59 @@ module issue_read_operands
         .still_issued_i(fwd_i.still_issued),
         .issue_pointer_i(fwd_i.issue_pointer),
         .idx_o(idx_hzd_rs3[i]),
-        .valid_o(rs3_raw_check[i])
+        .valid_o(rs3_raw_check[i]),
+        .matches_o()
     );
     assign rs3_has_raw[i] = rs3_raw_check[i] && (rs3_fpr[i] || rs3_gpr_cvxif[i]);
+
+    // RS2 is replaced by an immediate for ordinary immediate-form operations.
+    assign rs2_operand_used[i] = !(issue_instr_i[i].use_imm &&
+        (issue_instr_i[i].fu != STORE) &&
+        (issue_instr_i[i].fu != CTRL_FLOW) &&
+        (issue_instr_i[i].fu != ACCEL) &&
+        !(CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[i].op)));
+
+    `ifndef SYNTHESIS
+      // The end address is exclusive, matching ordinary linker-symbol ranges.
+      assign dependency_feedback_pc_eligible[i] =
+          (issue_instr_i[i].pc >= dependency_feedback_pc_start) &&
+          (issue_instr_i[i].pc < dependency_feedback_pc_end);
+    `else
+      // A future hardware controller will replace the simulation PC window.
+      assign dependency_feedback_pc_eligible[i] = 1'b1;
+    `endif
+
+    // Reject invalid, flushed, and exception-bearing consumers before sampling.
+    assign dependency_feedback_sample_valid[2*i] = issue_instr_valid_i[i] &&
+        !flush_i && !issue_instr_i[i].ex.valid && dependency_feedback_pc_eligible[i] &&
+        !issue_instr_i[i].use_zimm;
+    assign dependency_feedback_sample_valid[2*i+1] = issue_instr_valid_i[i] &&
+        !flush_i && !issue_instr_i[i].ex.valid && dependency_feedback_pc_eligible[i] &&
+        rs2_operand_used[i];
+    assign dependency_feedback_raw_valid[2*i] = rs1_has_raw[i];
+    assign dependency_feedback_raw_valid[2*i+1] = rs2_has_raw[i];
+    assign dependency_feedback_raw_matches[2*i] = raw_matches_rs1[i];
+    assign dependency_feedback_raw_matches[2*i+1] = raw_matches_rs2[i];
+    assign dependency_feedback_producer_idx[2*i] = idx_hzd_rs1[i];
+    assign dependency_feedback_producer_idx[2*i+1] = idx_hzd_rs2[i];
   end
+
+  // Keep the compact accumulator next to the signals it summarizes.
+  dependency_feedback_monitor #(
+      .NrObservations(DEPENDENCY_FEEDBACK_OBSERVATIONS),
+      .NrSbEntries(CVA6Cfg.NR_SB_ENTRIES),
+      .TransIdBits(CVA6Cfg.TRANS_ID_BITS)
+  ) i_dependency_feedback_monitor (
+      .clk_i,
+      .rst_ni,
+      .sample_valid_i(dependency_feedback_sample_valid),
+      .raw_valid_i(dependency_feedback_raw_valid),
+      .raw_matches_i(dependency_feedback_raw_matches),
+      .producer_idx_i(dependency_feedback_producer_idx),
+      .issue_pointer_i(fwd_i.issue_pointer),
+      .still_issued_i(fwd_i.still_issued),
+      .feedback_o(dependency_feedback)
+  );
 
   // ----------------------------------
   // Read Operands (a.k.a forwarding)
@@ -1045,6 +1144,9 @@ module issue_read_operands
     final begin
       if (dependency_trace_fd != 0) $fclose(dependency_trace_fd);
       if (raw_checker_trace_fd != 0) $fclose(raw_checker_trace_fd);
+      if (dependency_feedback_fd != 0) begin
+        $fclose(dependency_feedback_fd);
+      end
     end
 
     // Record the exact inputs and outputs of the official RS1 and RS2
@@ -1063,11 +1165,11 @@ module issue_read_operands
             );
             $fdisplay(
                 raw_checker_trace_fd,
-                "%0d,%0d,2,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,1",
+                "%0d,%0d,2,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,%0d",
                 dependency_trace_cycle, i, issue_instr_i[i].pc,
                 issue_instr_i[i].rs2, rs2_fpr[i], raw_checker_rd_flat,
                 rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
-                idx_hzd_rs2[i], rs2_raw_check[i]
+                idx_hzd_rs2[i], rs2_raw_check[i], rs2_operand_used[i]
             );
           end
         end
