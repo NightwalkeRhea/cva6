@@ -216,6 +216,46 @@ module issue_read_operands
   // forwarding signals
   logic [CVA6Cfg.NrIssuePorts-1:0] forward_rs1, forward_rs2, forward_rs3;
 
+  `ifndef SYNTHESIS
+    // Simulation-only dependency-resolution tracer. Source encodings are:
+    // 0=REGFILE, 1=SCOREBOARD, 2=FLU_WB, 3=STORE_WB, 4=LOAD_WB,
+    // 5=FPU_OR_ALU2_WB, 6=X_WB, 7=SAME_CYCLE_ALU, 8=UNAVAILABLE,
+    // 9=PC, 10=ZIMM, 11=IMMEDIATE.
+    integer dependency_trace_fd;
+    longint unsigned dependency_trace_cycle;
+    string dependency_trace_file;
+    logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs1_source;
+    logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs2_source;
+    logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs1;
+    logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs2;
+    logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs1_forward_consumed;
+    logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs2_forward_consumed;
+
+    initial begin
+      dependency_trace_fd = 0;
+      dependency_trace_cycle = 0;
+
+      if ($value$plusargs("dependency_trace_file=%s", dependency_trace_file)) begin
+        dependency_trace_fd = $fopen(dependency_trace_file, "w");
+        if (dependency_trace_fd == 0) begin
+          $fatal(1, "Cannot open dependency trace file: %s", dependency_trace_file);
+        end
+        $fdisplay(
+            dependency_trace_fd,
+            "cycle,issue_port,pc,instruction,consumer_id,fu,operation,rs1,rs2,rs1_has_raw,rs2_has_raw,rs1_producer_id,rs2_producer_id,rs1_ready,rs2_ready,rs1_forwarded,rs2_forwarded,rs1_source,rs2_source,same_cycle_dep_rs1,same_cycle_dep_rs2,same_cycle_bypass_rs1,same_cycle_bypass_rs2,raw_stall_rs1,raw_stall_rs2,structural_stall,external_stall,issue_accepted,flush"
+        );
+      end
+    end
+
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+      if (!rst_ni) begin
+        dependency_trace_cycle <= 0;
+      end else begin
+        dependency_trace_cycle <= dependency_trace_cycle + 1;
+      end
+    end
+  `endif
+
   // original instruction
   riscv::instruction_t [CVA6Cfg.NrIssuePorts-1:0] orig_instr;
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
@@ -886,6 +926,106 @@ module issue_read_operands
       end
     end
   end
+
+  `ifndef SYNTHESIS
+    // Classify the source actually selected for each forwarded operand.
+    always_comb begin : dependency_trace_source_classification
+      dependency_rs1_source = '{default: 4'd0};
+      dependency_rs2_source = '{default: 4'd0};
+      same_cycle_dep_rs1 = '0;
+      same_cycle_dep_rs2 = '0;
+      dependency_rs1_forward_consumed = forward_rs1;
+      dependency_rs2_forward_consumed = forward_rs2;
+
+      for (int unsigned i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+        if (rs1_has_raw[i]) begin
+          dependency_rs1_source[i] = rs1_valid[i] ? 4'd1 : 4'd8;
+        end
+        if (rs2_has_raw[i]) begin
+          dependency_rs2_source[i] = rs2_valid[i] ? 4'd1 : 4'd8;
+        end
+
+        for (int unsigned p = 0; p < CVA6Cfg.NrWbPorts; p++) begin
+          if (rs1_has_raw[i] && fwd_i.wb[p].valid && !fwd_i.wb[p].ex_valid &&
+              fwd_i.wb[p].trans_id == idx_hzd_rs1[i]) begin
+            dependency_rs1_source[i] = 4'(p + 2);
+          end
+          if (rs2_has_raw[i] && fwd_i.wb[p].valid && !fwd_i.wb[p].ex_valid &&
+              fwd_i.wb[p].trans_id == idx_hzd_rs2[i]) begin
+            dependency_rs2_source[i] = 4'(p + 2);
+          end
+        end
+      end
+
+      if (CVA6Cfg.SuperscalarEn) begin
+        same_cycle_dep_rs1[1] = issue_instr_valid_i[0] && !issue_instr_i[1].use_zimm &&
+            issue_instr_i[1].rs1 == issue_instr_i[0].rd && issue_instr_i[1].rs1 != '0;
+        same_cycle_dep_rs2[1] = issue_instr_valid_i[0] &&
+            issue_instr_i[1].rs2 == issue_instr_i[0].rd &&
+            issue_instr_i[1].rs2 != '0;
+
+        if (alu_bypass.rs1_from_rd) begin
+          dependency_rs1_source[1] = 4'd7;
+          dependency_rs1_forward_consumed[1] = 1'b0;
+        end
+        if (alu_bypass.rs2_from_rd) begin
+          dependency_rs2_source[1] = 4'd7;
+          dependency_rs2_forward_consumed[1] = 1'b0;
+        end
+      end
+
+      // Mirror the final operand-mux priority. A prepared forwarded value is
+      // not consumed if a PC, Z-immediate, or ordinary immediate overrides it.
+      for (int unsigned i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+        if (issue_instr_i[i].use_pc) begin
+          dependency_rs1_source[i] = 4'd9;
+          dependency_rs1_forward_consumed[i] = 1'b0;
+        end
+        if (issue_instr_i[i].use_zimm) begin
+          dependency_rs1_source[i] = 4'd10;
+          dependency_rs1_forward_consumed[i] = 1'b0;
+        end
+        if (issue_instr_i[i].use_imm && issue_instr_i[i].fu != STORE &&
+            issue_instr_i[i].fu != CTRL_FLOW && issue_instr_i[i].fu != ACCEL &&
+            !(CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[i].op))) begin
+          dependency_rs2_source[i] = 4'd11;
+          dependency_rs2_forward_consumed[i] = 1'b0;
+        end
+      end
+    end
+
+    // Log every valid issue attempt. Repeated rows intentionally measure the
+    // duration of an unresolved dependency or structural stall.
+    always_ff @(posedge clk_i) begin : dependency_trace_write
+      if (rst_ni && dependency_trace_fd != 0) begin
+        for (int unsigned i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+          if (issue_instr_valid_i[i]) begin
+            $fdisplay(
+                dependency_trace_fd,
+                "%0d,%0d,%0h,%0h,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
+                dependency_trace_cycle, i, issue_instr_i[i].pc, orig_instr_i[i],
+                issue_instr_i[i].trans_id, issue_instr_i[i].fu, issue_instr_i[i].op,
+                issue_instr_i[i].rs1, issue_instr_i[i].rs2,
+                rs1_has_raw[i], rs2_has_raw[i], idx_hzd_rs1[i], idx_hzd_rs2[i],
+                rs1_valid[i], rs2_valid[i], dependency_rs1_forward_consumed[i],
+                dependency_rs2_forward_consumed[i],
+                dependency_rs1_source[i], dependency_rs2_source[i],
+                same_cycle_dep_rs1[i], same_cycle_dep_rs2[i],
+                (i == 1) && alu_bypass.rs1_from_rd,
+                (i == 1) && alu_bypass.rs2_from_rd,
+                rs1_has_raw[i] && !rs1_valid[i],
+                rs2_has_raw[i] && !rs2_valid[i], fu_busy[i], stall_i,
+                issue_ack_o[i], flush_i
+            );
+          end
+        end
+      end
+    end
+
+    final begin
+      if (dependency_trace_fd != 0) $fclose(dependency_trace_fd);
+    end
+  `endif
 
   // ----------------------
   // Integer Register File
