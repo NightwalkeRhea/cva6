@@ -1,0 +1,16 @@
+read_verilog -sv core/dependency_feedback_monitor.sv
+read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_cv32a65x_pair.sv
+
+# Select the identical RAW cone plus the integrated five-bit accumulator.
+hierarchy -check -top dependency_feedback_cv32a65x_monitored
+proc
+opt
+flatten
+opt
+synth -top dependency_feedback_cv32a65x_monitored
+stat
+check
+ltp -noff
+
+write_verilog -noattr fi-results/milestone8fd-synthesis/monitored_netlist.v
+write_json fi-results/milestone8fd-synthesis/monitored_netlist.json

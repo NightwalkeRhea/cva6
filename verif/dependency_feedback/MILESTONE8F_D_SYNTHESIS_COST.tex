@@ -1,0 +1,90 @@
+\subsubsection*{Milestone 8F-D: Cost of the integrated monitor}
+
+I measured the monitor cost using a paired synthesis experiment for the
+\texttt{cv32a65x} configuration. The baseline contains four RAW dependency
+observations: RS1 and RS2 for each of the two issue ports. All four observations
+use the same eight-entry scoreboard.
+
+The monitored design contains exactly the same four RAW observations and adds
+one shared five-bit sticky monitor. The monitor consumes the match vectors
+already calculated by the RAW checkers, so it does not duplicate the register
+comparators.
+
+I synthesized both designs with the same Yosys version, optimization passes,
+and generic-cell mapping:
+
+\begin{verbatim}
+yosys -Q \
+  -l fi-results/milestone8fd-synthesis/baseline.log \
+  verif/dependency_feedback/scripts/\
+synth_dependency_feedback_cv32a65x_baseline.ys
+
+yosys -Q \
+  -l fi-results/milestone8fd-synthesis/monitored.log \
+  verif/dependency_feedback/scripts/\
+synth_dependency_feedback_cv32a65x_monitored.ys
+\end{verbatim}
+
+The synthesis results were:
+
+\begin{center}
+\begin{tabular}{lrrrr}
+\hline
+Metric & Baseline & Monitored & Delta & Delta percentage \\
+\hline
+Wires               & 859  & 1050 & +191 & +22.24\% \\
+Wire bits           & 1278 & 1568 & +290 & +22.69\% \\
+Hardware cells      & 823  & 1005 & +182 & +22.11\% \\
+Combinational cells & 823  & 1000 & +177 & +21.51\% \\
+State cells         & 0    & 5    & +5   & N/A \\
+\hline
+\end{tabular}
+\end{center}
+
+The hardware-cell counts exclude Yosys \texttt{\$scopeinfo} metadata because
+it does not represent physical hardware. Both netlists passed the Yosys
+structural check with zero reported problems.
+
+The monitored netlist contains exactly five \texttt{\$\_DFF\_PN0\_} cells.
+This confirms that every sticky feedback bit survived synthesis and was not
+optimized away.
+
+\subsubsection*{Non-interference proof}
+
+I also created a formal paired wrapper that drives the baseline and monitored
+RAW cones with identical symbolic inputs. I asked Yosys SAT to prove that all
+four RAW-valid outputs and all four selected-producer indices remain identical.
+
+The result was:
+
+\begin{verbatim}
+SAT proof finished - no model found: SUCCESS!
+\end{verbatim}
+
+Therefore, adding the feedback monitor does not change the dependency decisions
+produced by the modeled RAW-checker boundary.
+
+\subsubsection*{Structural-depth limitation}
+
+The generic baseline netlist has a longest topological path of 15 logic levels,
+ending at a producer-index output. The monitored netlist has a 25-level path
+ending at a feedback-register input. The additional path belongs to the
+observational monitor and does not feed an architectural RAW output.
+
+I do not interpret these numbers as a timing or frequency result. This
+open-source flow does not use a target standard-cell timing library, placement,
+routing, or extracted fanout. A credible critical-path comparison must be
+performed later using the target technology or the commercial synthesis flow.
+
+\subsubsection*{Result}
+
+The real dual-issue monitor boundary adds 182 generic hardware cells, consisting
+of 177 combinational cells and five state cells. The reported 22.11\% increase
+is relative only to the small four-checker RAW cone. It is not a 22.11\%
+increase in the area of the complete CVA6 processor.
+
+This experiment shows that the integrated monitor is synthesizable, that its
+state survives optimization, that it reuses existing dependency comparisons,
+and that it remains observational with respect to RAW decisions. The next step
+is therefore the controlled MicroGP experiment with and without the five-bit
+feedback under the same generation and fault budgets.

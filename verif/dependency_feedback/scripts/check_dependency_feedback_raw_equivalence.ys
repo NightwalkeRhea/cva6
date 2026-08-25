@@ -1,0 +1,7 @@
+read_verilog -sv core/dependency_feedback_monitor.sv
+read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_cv32a65x_pair.sv
+
+prep -top dependency_feedback_cv32a65x_raw_equivalence -flatten
+
+# Prove for every possible shared input that the RAW outputs remain identical.
+sat -verify -prove mismatch_o 0
