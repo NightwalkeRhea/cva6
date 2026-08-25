@@ -22,6 +22,8 @@ module raw_checker_replay_tb;
   integer operand_used;
   integer vectors;
   integer errors;
+  integer valid_errors;
+  integer producer_index_errors;
   integer first_error_vector;
   longint unsigned cycle;
   logic [31:0] pc;
@@ -31,6 +33,8 @@ module raw_checker_replay_tb;
   initial begin
     vectors = 0;
     errors = 0;
+    valid_errors = 0;
+    producer_index_errors = 0;
     first_error_vector = 0;
     fault_campaign = $test$plusargs("fault_campaign");
 
@@ -57,15 +61,34 @@ module raw_checker_replay_tb;
       repeat (4) #1;
       vectors++;
 
-      if (dependency_valid_o !== expected_valid[0] ||
-          producer_idx_o !== expected_idx) begin
+      // The valid flag always matters: it decides whether a dependency exists.
+      if (dependency_valid_o !== expected_valid[0]) begin
+        valid_errors++;
         errors++;
         if (first_error_vector == 0) first_error_vector = vectors;
         if (errors <= 5) begin
           $display(
-              "RAW_MISMATCH vector=%0d cycle=%0d port=%0d operand=%0d pc=%0h expected_valid=%0d actual_valid=%0d expected_idx=%0d actual_idx=%0d",
+              "RAW_VALID_MISMATCH vector=%0d cycle=%0d port=%0d operand=%0d pc=%0h expected_valid=%0d actual_valid=%0d",
               vectors, cycle, issue_port, operand, pc, expected_valid,
-              dependency_valid_o, expected_idx, producer_idx_o
+              dependency_valid_o
+          );
+          $display("  rs=%0h rd_flat=%0h still=%0h pointer=%0h", rs_i,
+                   rd_flat_i, still_issued_i, issue_pointer_i);
+        end
+      end
+
+      // The producer index matters only when the golden checker found a RAW.
+      // When valid is zero, RTL is free to leave any value on this output.
+      if (expected_valid[0] && dependency_valid_o === 1'b1 &&
+          producer_idx_o !== expected_idx) begin
+        producer_index_errors++;
+        errors++;
+        if (first_error_vector == 0) first_error_vector = vectors;
+        if (errors <= 5) begin
+          $display(
+              "RAW_INDEX_MISMATCH vector=%0d cycle=%0d port=%0d operand=%0d pc=%0h expected_idx=%0d actual_idx=%0d",
+              vectors, cycle, issue_port, operand, pc, expected_idx,
+              producer_idx_o
           );
           $display("  rs=%0h rd_flat=%0h still=%0h pointer=%0h", rs_i,
                    rd_flat_i, still_issued_i, issue_pointer_i);
@@ -77,6 +100,8 @@ module raw_checker_replay_tb;
     $display("Trace: %s", trace_file);
     $display("Vectors: %0d", vectors);
     $display("Errors: %0d", errors);
+    $display("Valid errors: %0d", valid_errors);
+    $display("Producer-index errors: %0d", producer_index_errors);
     $display("First error vector: %0d", first_error_vector);
 
     if (fault_campaign) begin

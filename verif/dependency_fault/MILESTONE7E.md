@@ -58,23 +58,30 @@ Direct mutations of `producer_idx_o` and `dependency_valid_o` remain excluded.
 Each mutation was replayed against all four payload traces: 360 classified
 trace--fault pairs, with zero infrastructure errors.
 
+Milestone 8A later found that the first replay checker compared the producer
+index even when dependency-valid was zero. That index is a don't-care unless a
+RAW dependency exists. The campaign was therefore rerun with producer-index
+comparison gated by the golden valid flag. The corrected results below replace
+the original exploratory counts; the original CSV remains archived so the
+methodological correction is auditable.
+
 ## Results
 
 ```text
 treatment           detected / 90    coverage    exclusive in corpus
-independent              26           28.89%       0
-same_cycle_bypass        26           28.89%       0
-load_use                 47           52.22%      20
-scoreboard_forward       52           57.78%      24
-combined corpus          72           80.00%       -
+independent              12           13.33%       0
+same_cycle_bypass        12           13.33%       0
+load_use                 43           47.78%      20
+scoreboard_forward       49           54.44%      25
+combined corpus          69           76.67%       -
 ```
 
-Independent and same-cycle-bypass detect exactly the same 26 faults. This is
+Independent and same-cycle-bypass detect exactly the same 12 faults. This is
 expected for this boundary: same-cycle ALU bypass is resolved outside
-`raw_checker`. Scoreboard forwarding adds 26 faults over independent. Load-use
-adds 22, while losing one baseline fault. Load-use and scoreboard-forwarding
-also detect different sets: 20 faults only in load-use, 25 only in
-scoreboard-forwarding, and 27 in both.
+`raw_checker`. Scoreboard forwarding adds 37 faults over independent. Load-use
+adds 32, while losing one baseline fault. Load-use and scoreboard-forwarding
+also detect different sets: 20 faults only in load-use, 26 only in
+scoreboard-forwarding, and 23 in both.
 
 ## Meaning
 
