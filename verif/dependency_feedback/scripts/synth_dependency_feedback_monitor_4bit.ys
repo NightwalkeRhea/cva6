@@ -1,0 +1,14 @@
+read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_monitor_4bit.sv
+
+# Synthesize only the four-bit integration candidate.
+hierarchy -check -top dependency_feedback_monitor_4bit
+proc
+opt
+flatten
+opt
+synth -top dependency_feedback_monitor_4bit
+stat
+check
+
+write_verilog -noattr fi-results/milestone8e-synthesis/monitor_4bit_netlist.v
+write_json fi-results/milestone8e-synthesis/monitor_4bit_netlist.json

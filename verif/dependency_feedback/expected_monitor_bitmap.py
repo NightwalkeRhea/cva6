@@ -33,6 +33,7 @@ def raw_matches(row):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("trace", type=Path)
+    parser.add_argument("--variant", choices=("8", "5", "4"), default="8")
     args = parser.parse_args()
     bitmap = 0
 
@@ -57,6 +58,13 @@ def main():
             bitmap |= (1 <= live_entries <= 2) << 5
             bitmap |= (3 <= live_entries <= 4) << 6
             bitmap |= (live_entries >= 5) << 7
+
+    if args.variant == "4":
+        # Keep only RAW-valid, multiplicity, wrapped, and non-wrapped bits.
+        bitmap &= 0x0F
+    elif args.variant == "5":
+        # Move the eight-bit prototype's medium-occupancy bit into bit 4.
+        bitmap = (bitmap & 0x0F) | (((bitmap >> 6) & 1) << 4)
 
     print(f"{bitmap:02x}")
 

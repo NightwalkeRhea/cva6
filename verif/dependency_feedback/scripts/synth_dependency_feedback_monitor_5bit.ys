@@ -1,0 +1,14 @@
+read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_monitor_5bit.sv
+
+# Synthesize only the five-bit integration candidate.
+hierarchy -check -top dependency_feedback_monitor_5bit
+proc
+opt
+flatten
+opt
+synth -top dependency_feedback_monitor_5bit
+stat
+check
+
+write_verilog -noattr fi-results/milestone8e-synthesis/monitor_5bit_netlist.v
+write_json fi-results/milestone8e-synthesis/monitor_5bit_netlist.json
