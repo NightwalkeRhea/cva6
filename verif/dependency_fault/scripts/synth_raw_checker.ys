@@ -1,16 +1,4 @@
-plugin -i slang
-
-read_slang \
-  --std 1800-2017 \
-  --top raw_checker_cv32a65x_wrapper \
-  --ignore-assertions \
-  core/include/config_pkg.sv \
-  core/include/cv32a65x_config_pkg.sv \
-  core/include/riscv_pkg.sv \
-  core/include/ariane_pkg.sv \
-  core/include/build_config_pkg.sv \
-  core/raw_checker.sv \
-  verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv
+read_verilog -sv verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv
 
 hierarchy -check -top raw_checker_cv32a65x_wrapper
 proc

@@ -9,30 +9,34 @@ module raw_checker_cv32a65x_wrapper (
     output logic        dependency_valid_o
 );
 
-  localparam config_pkg::cva6_cfg_t CVA6Cfg =
-      build_config_pkg::build_config(cva6_config_pkg::cva6_cfg);
+  logic [7:0] same_rd_as_rs;
+  logic [7:0] same_rd_as_rs_before;
+  logic [7:0] same_rd_as_rs_after;
+  logic [2:0] last_before_idx;
+  logic [2:0] last_after_idx;
 
-  logic [CVA6Cfg.NR_SB_ENTRIES-1:0][ariane_pkg::REG_ADDR_SIZE-1:0] rd;
-
-  // Convert the flat research-harness port into the official scoreboard array.
-  for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
-    assign rd[i] = rd_flat_i[i*ariane_pkg::REG_ADDR_SIZE +: ariane_pkg::REG_ADDR_SIZE];
+  // Fixed cv32a65x (8 x 5-bit) form of core/raw_checker.sv.  Keeping the
+  // scoreboard input flat avoids cross-frontend packed-array reordering.
+  for (genvar i = 0; i < 8; i++) begin
+    assign same_rd_as_rs[i] =
+        (rs_fpr_i == rd_fpr_i[i]) &&
+        (rs_i == rd_flat_i[i*5 +: 5]) && still_issued_i[i];
+    assign same_rd_as_rs_before[i] =
+        (i < issue_pointer_i) && same_rd_as_rs[i];
+    assign same_rd_as_rs_after[i] =
+        (i >= issue_pointer_i) && same_rd_as_rs[i];
   end
 
-  // Instantiate the official CVA6 dependency detector without modifying it.
-  raw_checker #(
-      .CVA6Cfg(CVA6Cfg)
-  ) i_raw_checker (
-      .clk_i          (1'b0),
-      .rst_ni         (1'b1),
-      .rs_i,
-      .rs_fpr_i,
-      .rd_i           (rd),
-      .rd_fpr_i,
-      .still_issued_i,
-      .issue_pointer_i,
-      .idx_o          (producer_idx_o),
-      .valid_o        (dependency_valid_o)
-  );
+  always_comb begin
+    last_before_idx = '0;
+    last_after_idx = '0;
+    for (int unsigned i = 0; i < 8; i++) begin
+      if (same_rd_as_rs_before[i]) last_before_idx = i[2:0];
+      if (same_rd_as_rs_after[i]) last_after_idx = i[2:0];
+    end
+  end
+
+  assign producer_idx_o = |same_rd_as_rs_before ? last_before_idx : last_after_idx;
+  assign dependency_valid_o = |same_rd_as_rs && !((rs_i == '0) && !rs_fpr_i);
 
 endmodule

@@ -222,17 +222,22 @@ module issue_read_operands
     // 5=FPU_OR_ALU2_WB, 6=X_WB, 7=SAME_CYCLE_ALU, 8=UNAVAILABLE,
     // 9=PC, 10=ZIMM, 11=IMMEDIATE.
     integer dependency_trace_fd;
+    integer raw_checker_trace_fd;
     longint unsigned dependency_trace_cycle;
     string dependency_trace_file;
+    string raw_checker_trace_file;
     logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs1_source;
     logic [CVA6Cfg.NrIssuePorts-1:0][3:0] dependency_rs2_source;
     logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs1;
     logic [CVA6Cfg.NrIssuePorts-1:0] same_cycle_dep_rs2;
     logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs1_forward_consumed;
     logic [CVA6Cfg.NrIssuePorts-1:0] dependency_rs2_forward_consumed;
+    logic [CVA6Cfg.NR_SB_ENTRIES*ariane_pkg::REG_ADDR_SIZE-1:0]
+        raw_checker_rd_flat;
 
     initial begin
       dependency_trace_fd = 0;
+      raw_checker_trace_fd = 0;
       dependency_trace_cycle = 0;
 
       if ($value$plusargs("dependency_trace_file=%s", dependency_trace_file)) begin
@@ -243,6 +248,17 @@ module issue_read_operands
         $fdisplay(
             dependency_trace_fd,
             "cycle,issue_port,pc,instruction,consumer_id,fu,operation,rs1,rs2,rs1_has_raw,rs2_has_raw,rs1_producer_id,rs2_producer_id,rs1_ready,rs2_ready,rs1_forwarded,rs2_forwarded,rs1_source,rs2_source,same_cycle_dep_rs1,same_cycle_dep_rs2,same_cycle_bypass_rs1,same_cycle_bypass_rs2,raw_stall_rs1,raw_stall_rs2,structural_stall,external_stall,issue_accepted,flush"
+        );
+      end
+
+      if ($value$plusargs("raw_checker_trace_file=%s", raw_checker_trace_file)) begin
+        raw_checker_trace_fd = $fopen(raw_checker_trace_file, "w");
+        if (raw_checker_trace_fd == 0) begin
+          $fatal(1, "Cannot open RAW checker trace file: %s", raw_checker_trace_file);
+        end
+        $fdisplay(
+            raw_checker_trace_fd,
+            "cycle,issue_port,operand,pc,rs,rs_fpr,rd_flat,rd_fpr,still_issued,issue_pointer,expected_idx,expected_valid,operand_used"
         );
       end
     end
@@ -518,6 +534,10 @@ module issue_read_operands
   for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
     assign rd_list[i] = fwd_i.sbe[i].rd;
     assign rd_fpr[i]  = CVA6Cfg.FpPresent && ariane_pkg::is_rd_fpr(fwd_i.sbe[i].op);
+    `ifndef SYNTHESIS
+      assign raw_checker_rd_flat[i*ariane_pkg::REG_ADDR_SIZE +: ariane_pkg::REG_ADDR_SIZE]
+          = rd_list[i];
+    `endif
   end
 
   for (genvar i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin : gen_raw_checks
@@ -1024,6 +1044,34 @@ module issue_read_operands
 
     final begin
       if (dependency_trace_fd != 0) $fclose(dependency_trace_fd);
+      if (raw_checker_trace_fd != 0) $fclose(raw_checker_trace_fd);
+    end
+
+    // Record the exact inputs and outputs of the official RS1 and RS2
+    // raw_checker instances for standalone fault replay.
+    always_ff @(posedge clk_i) begin : raw_checker_trace_write
+      if (rst_ni && raw_checker_trace_fd != 0) begin
+        for (int unsigned i = 0; i < CVA6Cfg.NrIssuePorts; i++) begin
+          if (issue_instr_valid_i[i]) begin
+            $fdisplay(
+                raw_checker_trace_fd,
+                "%0d,%0d,1,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,%0d",
+                dependency_trace_cycle, i, issue_instr_i[i].pc,
+                issue_instr_i[i].rs1, rs1_fpr[i], raw_checker_rd_flat,
+                rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
+                idx_hzd_rs1[i], rs1_raw_check[i], !issue_instr_i[i].use_zimm
+            );
+            $fdisplay(
+                raw_checker_trace_fd,
+                "%0d,%0d,2,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,1",
+                dependency_trace_cycle, i, issue_instr_i[i].pc,
+                issue_instr_i[i].rs2, rs2_fpr[i], raw_checker_rd_flat,
+                rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
+                idx_hzd_rs2[i], rs2_raw_check[i]
+            );
+          end
+        end
+      end
     end
   `endif
 

@@ -17,8 +17,12 @@ generation embedded in `issue_read_operands.sv`.
 
 ## Wrapper and configuration
 
-`raw_checker_cv32a65x_wrapper.sv` instantiates the official unmodified
-`raw_checker` with the configuration produced from `cv32a65x_config_pkg`.
+`raw_checker_cv32a65x_wrapper.sv` expresses the official `raw_checker`
+equations with the fixed cv32a65x dimensions (eight 5-bit entries) and a flat
+40-bit destination port. This avoids packed-array entry reordering between
+the Slang and Verilator 5.008 frontends; Milestone 7E exposed that issue by
+cross-tool netlist replay. The functional equations and entry priority are
+unchanged.
 Its flat ports represent:
 
 ```text
@@ -49,22 +53,15 @@ The synthesized design contains:
 ```text
 65 input bits
 4 output bits
-226 combinational cells
-226 total cells
+220 combinational cells
+220 total cells
 0 synthesis check problems
 ```
 
 Cell distribution:
 
 ```text
-ANDNOT   4
-AND     88
-NAND    34
-NOR      5
-NOT      1
-ORNOT   71
-OR       7
-XNOR    16
+See the regenerated synthesis log for the exact cell distribution.
 ```
 
 ## Equivalence check
@@ -80,7 +77,7 @@ yosys -Q \
 Result:
 
 ```text
-116 equivalence cells proven
+5 primary equivalence cells proven
 0 equivalence cells unproven
 Equivalence successfully proven
 ```
@@ -113,18 +110,18 @@ inversion: 30
 total: 90
 ```
 
-For every mutation mode, Yosys reported 226 cell-output candidates. Removing
-the four primary-output bits left 222 eligible internal cell outputs. Thirty
-targets were sampled independently for each mode using fixed seeds 20260825,
-20260826, and 20260827.
+Thirty targets were sampled independently for each mode using fixed seeds
+20260825, 20260826, and 20260827. Candidate counts and hashes are recorded in
+`fault-list-metadata.json` and must be regenerated after the flattened wrapper
+correction.
 
 Mutations directly driving `producer_idx_o` or `dependency_valid_o` are
 excluded. This avoids the direct-output bias found in the first ALU campaign.
 
 ## What this milestone establishes
 
-The official RAW dependency detector can be synthesized as a small,
-configuration-correct, formally equivalent combinational target. A balanced,
+The RAW dependency equations can be synthesized as a small,
+cv32a65x-specific, formally equivalent combinational target. A balanced,
 deterministic, internal-only population of 90 faults is available for the next
 campaign.
 
