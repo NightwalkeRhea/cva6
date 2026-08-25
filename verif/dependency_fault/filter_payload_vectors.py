@@ -27,6 +27,7 @@ def main():
         writer.writeheader()
         for row in reader:
             pc = int(row["pc"], 16)
+            # Use [start, end), exactly like the two assembly linker symbols.
             if args.start <= pc < args.end:
                 writer.writerow(row)
                 kept += 1

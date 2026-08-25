@@ -1,5 +1,7 @@
 module alu_replay_tb;
 
+  // Replay recorded ALU transactions without simulating the rest of CVA6.
+
   logic [7:0]  operation_i;
   logic [31:0] operand_a_i;
   logic [31:0] operand_b_i;
@@ -42,6 +44,7 @@ module alu_replay_tb;
       input logic [31:0] operand_a,
       input logic [31:0] operand_b
   );
+    // Recreate the branch decision because the synthesis wrapper exposes it too.
     case (operation)
       8'd13: calculate_branch_result = $signed(operand_a) <  $signed(operand_b);
       8'd14: calculate_branch_result = operand_a < operand_b;
@@ -54,6 +57,7 @@ module alu_replay_tb;
   endfunction
 
   initial begin
+    // One execution consumes one CSV and compares every combinational result.
     operation_i      = '0;
     operand_a_i      = '0;
     operand_b_i      = '0;
@@ -77,6 +81,7 @@ module alu_replay_tb;
     end
 
     while ($fgets(row_line, trace_fd) != 0) begin
+      // Accept the final line without a trailing newline, but reject partial rows.
       scan_count = $sscanf(
           row_line,
           "%d,%d,%d,%h,%h,%h,%h\n",
@@ -89,16 +94,17 @@ module alu_replay_tb;
           expected_result
       );
 
-        if (scan_count != 7) begin
+      if (scan_count != 7) begin
         $fatal(
             1,
             "Malformed CSV row after transaction %0d: fscanf returned %0d",
             transaction_count,
             scan_count
         );
-    end
+      end
 
       if (scan_count == 7) begin
+        // Give both RTL and mapped-gate implementations time to settle.
         operation_i = operation_value[7:0];
         operand_a_i = operand_a_value;
         operand_b_i = operand_b_value;
@@ -108,6 +114,7 @@ module alu_replay_tb;
         transaction_count = transaction_count + 1;
 
         if (result_o !== expected_result) begin
+          // Keep running so one trace reports the complete mismatch count.
           result_errors = result_errors + 1;
 
           $display(
@@ -157,7 +164,8 @@ module alu_replay_tb;
     $display("Result errors: %0d", result_errors);
     $display("Branch errors: %0d", branch_errors);
 
-        if (fault_campaign_mode != 0) begin
+    if (fault_campaign_mode != 0) begin
+      // A mismatch is a successful detection during mutation testing.
       if (result_errors != 0 || branch_errors != 0) begin
         $display("*** FAULT DETECTED ***");
       end else begin

@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 def read_trace(path):
+    """Load one ALU CSV and normalize numeric fields for set operations."""
     """Read one ALU CSV and convert hexadecimal fields to integers."""
     transactions = []
 
@@ -30,6 +31,7 @@ def read_trace(path):
 
 
 def transaction_vector(transaction):
+    """Describe stimulus independently of cycle number and ALU instance."""
     """Return the fields that define one ALU stimulus."""
     return (
         transaction["alu_id"],
@@ -40,6 +42,7 @@ def transaction_vector(transaction):
 
 
 def main():
+    """Summarize per-program ALU operations, vectors, branches, and novelty."""
     parser = argparse.ArgumentParser()
     parser.add_argument("trace_directory", type=Path)
     parser.add_argument("output_directory", type=Path)

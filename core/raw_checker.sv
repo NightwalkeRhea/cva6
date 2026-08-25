@@ -48,12 +48,14 @@ module raw_checker
   logic                             rs_is_gpr0;
 
   for (genvar i = 0; i < CVA6Cfg.NR_SB_ENTRIES; i++) begin
+    // First find every live producer, then split around the circular pointer.
     assign same_rd_as_rs[i] = (rs_fpr_i == rd_fpr_i[i]) && (rs_i == rd_i[i]) && still_issued_i[i];
     assign same_rd_as_rs_before[i] = (i < issue_pointer_i) && same_rd_as_rs[i];
     assign same_rd_as_rs_after[i] = (i >= issue_pointer_i) && same_rd_as_rs[i];
   end
 
   always_comb begin
+    // Scanning upward leaves the highest matching index on each pointer side.
     last_before_idx = '0;
     last_after_idx  = '0;
 
@@ -67,6 +69,7 @@ module raw_checker
     end
   end
 
+  // Prefer the non-wrapped side; otherwise select from the wrapped side.
   assign idx_o = |same_rd_as_rs_before ? last_before_idx : last_after_idx;
 
   assign rs_is_gpr0 = (rs_i == '0) && !rs_fpr_i;

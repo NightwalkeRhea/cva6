@@ -2,6 +2,7 @@ read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_cv32a65x_pair
 
 # Select the RAW-only member of the paired cost experiment.
 hierarchy -check -top dependency_feedback_cv32a65x_baseline
+# Use the same lowering and mapping sequence as the monitored member.
 proc
 opt
 flatten
@@ -9,6 +10,7 @@ opt
 synth -top dependency_feedback_cv32a65x_baseline
 stat
 check
+# Count generic logic levels only; this is not a technology timing report.
 ltp -noff
 
 write_verilog -noattr fi-results/milestone8fd-synthesis/baseline_netlist.v

@@ -30,6 +30,10 @@ module dependency_feedback_monitor #(
   logic [NrObservations-1:0][CountBits-1:0] matching_entries;
   logic [4:0] events;
 
+  // Bitmap meaning:
+  // bit 0 = any RAW, bit 1 = multiple producers, bit 2 = wrapped selection,
+  // bit 3 = non-wrapped selection, bit 4 = medium (3--4 entry) occupancy.
+
   always_comb begin
     // Count the shared occupancy once and the matching producers per operand.
     live_entries = '0;
@@ -49,6 +53,7 @@ module dependency_feedback_monitor #(
     events = '0;
     for (int unsigned observation = 0; observation < NrObservations; observation++) begin
       if (sample_valid_i[observation]) begin
+        // A RAW bit qualifies producer-related context; occupancy stands alone.
         events[0] |= raw_valid_i[observation];
         events[1] |= raw_valid_i[observation] &&
                      (matching_entries[observation] >= 2);

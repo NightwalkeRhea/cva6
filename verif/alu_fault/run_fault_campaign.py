@@ -30,6 +30,7 @@ MODE_RE = re.compile(r"-mode\s+(\S+)")
 
 
 def parse_arguments():
+    """Collect frozen netlist, fault list, traces, tools, and output paths."""
     parser = argparse.ArgumentParser(
         description="Generate ALU mutants and replay CVA6 ALU traces."
     )
@@ -80,6 +81,7 @@ def parse_arguments():
 
 
 def absolute_path(path, repository):
+    """Make paths stable because generated build commands change directories."""
     if path.is_absolute():
         return path.resolve()
 
@@ -87,6 +89,7 @@ def absolute_path(path, repository):
 
 
 def extract_integer(pattern, text):
+    """Read one numeric testbench result or return no value when absent."""
     match = pattern.search(text)
 
     if match is None:
@@ -105,6 +108,7 @@ def write_infrastructure_rows(
     stage,
     message,
 ):
+    """Record every skipped trace as an infrastructure failure, never coverage."""
     for trace in traces:
         trace_name = trace.stem
         program, alu_name = trace_name.rsplit(".", 1)
@@ -134,6 +138,7 @@ def write_infrastructure_rows(
 
 
 def main():
+    """Build every ALU mutant, replay every trace, and classify each pair."""
     args = parse_arguments()
 
     repository = Path(__file__).resolve().parents[2]

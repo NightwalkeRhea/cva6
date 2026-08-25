@@ -28,6 +28,7 @@ module raw_checker_cv32a65x_wrapper (
   end
 
   always_comb begin
+    // Scan upward so the final assignment is the newest index on each side.
     last_before_idx = '0;
     last_after_idx = '0;
     for (int unsigned i = 0; i < 8; i++) begin
@@ -36,7 +37,9 @@ module raw_checker_cv32a65x_wrapper (
     end
   end
 
+  // Prefer the ordinary side; use the wrapped side only when no earlier index matches.
   assign producer_idx_o = |same_rd_as_rs_before ? last_before_idx : last_after_idx;
+  // Integer x0 is constant and must never wait for a scoreboard producer.
   assign dependency_valid_o = |same_rd_as_rs && !((rs_i == '0) && !rs_fpr_i);
 
 endmodule

@@ -53,6 +53,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="cva6-dependency-faults-") as temp:
         temp_path = Path(temp)
         for mode_index, mode in enumerate(MODES):
+            # Give each mutation mode a fixed, independent random stream.
             mode_seed = args.seed + mode_index
             pool = temp_path / f"{mode}.txt"
             command = (
@@ -79,6 +80,7 @@ def main():
                 port_name = option(tokens, "-port")
                 port_bit = int(option(tokens, "-portbit"))
                 cell = module["cells"][cell_name]
+                # Keep only internal cell-output bits, never direct primary outputs.
                 if cell["port_directions"].get(port_name) != "output":
                     continue
                 bit = cell["connections"][port_name][port_bit]
@@ -94,6 +96,7 @@ def main():
                     f"requested {args.per_mode}"
                 )
             candidates.sort()
+            # Sorting before sampling makes selection independent of tool output order.
             chosen = random.Random(mode_seed).sample(candidates, args.per_mode)
             selected_all.extend(sorted(chosen))
             mode_metadata[mode] = {

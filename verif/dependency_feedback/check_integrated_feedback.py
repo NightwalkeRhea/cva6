@@ -24,6 +24,7 @@ def main() -> int:
     parser.add_argument("--pc-end", required=True)
     args = parser.parse_args()
 
+    # Read what the live CVA6 monitor actually accumulated during this payload.
     integrated = read_integrated_value(args.feedback)
 
     # Reuse the frozen Python specification rather than duplicating bit rules.
@@ -38,6 +39,7 @@ def main() -> int:
     ).strip()
     expected = int(expected_text, 16)
 
+    # Compare numbers, not strings: 0x9 and 0x09 are the same bitmap.
     verdict = "MATCH" if integrated == expected else "MISMATCH"
     print(f"integrated=0x{integrated:02x},offline=0x{expected:02x},status={verdict}")
     return 0 if integrated == expected else 1

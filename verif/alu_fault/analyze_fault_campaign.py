@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 def write_csv(path, fieldnames, rows):
+    """Write one deterministic result table for later inspection or LaTeX."""
     with path.open("w", newline="") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=fieldnames)
         writer.writeheader()
@@ -15,6 +16,7 @@ def write_csv(path, fieldnames, rows):
 
 
 def percentage(numerator, denominator):
+    """Return a display percentage while protecting an empty population."""
     if denominator == 0:
         return 0.0
 
@@ -22,6 +24,7 @@ def percentage(numerator, denominator):
 
 
 def main():
+    """Reduce all trace/fault outcomes into corpus, program, and mode summaries."""
     parser = argparse.ArgumentParser(
         description="Analyze CVA6 ALU fault-campaign results."
     )

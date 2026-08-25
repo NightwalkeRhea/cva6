@@ -23,12 +23,14 @@ def main():
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
     rows = list(csv.DictReader(args.results.open()))
+    # Recover the experiment dimensions directly from the campaign table.
     faults = sorted({row["fault_id"] for row in rows})
     traces = sorted({row["trace"] for row in rows})
     detected = defaultdict(set)
     for row in rows:
         if row["classification"] == "DETECTED":
             detected[row["trace"]].add(row["fault_id"])
+    # The corpus detects a fault when at least one treatment detects it.
     corpus = set().union(*(detected[name] for name in traces))
 
     summary = []
@@ -49,6 +51,7 @@ def main():
             if left >= right:
                 continue
             pairs.append({
+                # Set differences reveal complementary tests hidden by percentages.
                 "treatment_a": left, "treatment_b": right,
                 "faults_in_a_not_b": len(detected[left] - detected[right]),
                 "faults_in_b_not_a": len(detected[right] - detected[left]),

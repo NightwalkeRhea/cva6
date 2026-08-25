@@ -12,6 +12,7 @@ SHIFT_OPERATIONS = {0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C}
 
 
 def read_program(trace_directory, program):
+    """Merge both physical ALU traces into one program-level transaction list."""
     transactions = []
     for alu_id in (0, 1):
         path = trace_directory / f"{program}.alu{alu_id}.csv"
@@ -31,6 +32,7 @@ def read_program(trace_directory, program):
 
 
 def shift_bin(amount):
+    """Group exact shift amounts into compact feedback-friendly ranges."""
     if amount == 0:
         return "shift_0"
     if amount <= 7:
@@ -43,6 +45,7 @@ def shift_bin(amount):
 
 
 def descriptors(transactions):
+    """Calculate candidate ALU activity counts from retired transaction traces."""
     counts = Counter()
     counts["total_transactions"] = len(transactions)
 
@@ -74,6 +77,7 @@ def descriptors(transactions):
 
 
 def main():
+    """Compare the descriptor-targeting program with its equal-budget control."""
     parser = argparse.ArgumentParser()
     parser.add_argument("trace_directory", type=Path)
     parser.add_argument("output_directory", type=Path)

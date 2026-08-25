@@ -57,7 +57,7 @@ def main():
             live_entries = int(row["still_issued"], 16).bit_count()
             matching_entries = raw_matches(row).bit_count()
 
-            # Apply the same public bit specification without using the RTL.
+            # Rebuild the eight-bit prototype: RAW, multiplicity, wrap, then occupancy.
             bitmap |= valid << 0
             bitmap |= (valid and matching_entries >= 2) << 1
             bitmap |= (valid and producer >= pointer) << 2

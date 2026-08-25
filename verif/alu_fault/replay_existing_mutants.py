@@ -13,6 +13,7 @@ MISMATCH_RE = re.compile(r"(?:RESULT|BRANCH)_MISMATCH")
 
 
 def main():
+    """Replay new descriptor traces without rebuilding the frozen ALU mutants."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--builds", required=True, type=Path)
     parser.add_argument("--traces", required=True, type=Path)

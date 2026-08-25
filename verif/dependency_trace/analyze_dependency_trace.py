@@ -46,6 +46,7 @@ def main():
             f"Expected {expected_columns} columns, found {len(rows[0])}"
         )
 
+    # Separate completed issue handshakes from repeated stalled attempts.
     accepted = [row for row in rows if integer(row, "issue_accepted")]
     unavailable_accepted = [
         row for row in accepted
@@ -57,6 +58,7 @@ def main():
             "used an unavailable operand"
         )
 
+    # Same-cycle ALU bypass is counted separately from ordinary forwarding.
     ordinary_forward_sources = {1, 2, 3, 4, 5, 6}
     for operand in ("rs1", "rs2"):
         forwarded = sum(integer(row, f"{operand}_forwarded") for row in accepted)
@@ -70,6 +72,7 @@ def main():
                 f"forwarding flags but {classified} ordinary forwarding sources"
             )
 
+    # Preserve raw counts; percentages can be derived later without rerunning RTL.
     metrics = {
         "issue_attempt_rows": len(rows),
         "accepted_issues": len(accepted),

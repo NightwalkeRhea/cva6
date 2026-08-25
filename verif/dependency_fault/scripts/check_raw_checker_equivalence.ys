@@ -5,15 +5,18 @@ proc
 flatten
 opt
 rename raw_checker_cv32a65x_wrapper gold
+# Save the RTL version before loading the synthesized JSON into a clean design.
 design -stash gold_design
 
 read_json fi-results/milestone7d-synthesis/raw_checker_cv32a65x_netlist.json
 rename raw_checker_cv32a65x_wrapper gate
 design -stash gate_design
 
+# Place both versions in one equivalence wrapper with matched ports.
 design -copy-from gold_design -as gold gold
 design -copy-from gate_design -as gate gate
 equiv_make gold gate equiv
 hierarchy -check -top equiv
+# Prove every generated equivalence cell, then fail if any remain unproven.
 equiv_simple
 equiv_status -assert

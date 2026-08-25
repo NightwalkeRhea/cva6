@@ -15,6 +15,7 @@ MODES = ("const0", "const1", "inv")
 
 
 def parse_arguments():
+    """Collect the netlist, exclusions, balance, and deterministic seed."""
     parser = argparse.ArgumentParser(
         description=(
             "Generate a balanced Yosys mutation list targeting internal "
@@ -32,6 +33,7 @@ def parse_arguments():
 
 
 def option_value(tokens, option):
+    """Read one field from a tokenized Yosys mutation command."""
     try:
         position = tokens.index(option)
     except ValueError as error:
@@ -44,6 +46,7 @@ def option_value(tokens, option):
 
 
 def target_bit(module, mutation):
+    """Resolve a mutation command to the exact netlist bit it changes."""
     tokens = shlex.split(mutation)
     cell_name = option_value(tokens, "-cell")
     port_name = option_value(tokens, "-port")
@@ -77,6 +80,7 @@ def run_yosys_candidate_query(
     seed,
     output,
 ):
+    """Ask Yosys for a large deterministic candidate pool for one mode."""
     command = (
         f'read_json "{netlist}"; '
         f'hierarchy -check -top {top}; '
@@ -101,6 +105,7 @@ def run_yosys_candidate_query(
 
 
 def main():
+    """Select equal internal-only populations for const0, const1, and invert."""
     args = parse_arguments()
 
     if not args.yosys:

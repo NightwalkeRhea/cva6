@@ -56,12 +56,14 @@ def main():
         build_dir.mkdir(parents=True, exist_ok=True)
         mode = re.search(r"-mode\s+(\S+)", mutation).group(1)
 
+        # Materialize exactly one mutation into a standalone Verilog netlist.
         yosys_script = (
             f'read_json "{args.netlist}"; hierarchy -check -top {top}; '
             f'{mutation}; write_verilog -noattr "{netlist_v}"'
         )
         run([yosys, "-Q", "-p", yosys_script], log=fault_dir / "yosys.log")
         run([
+            # Build an independent replay executable for this mutant.
             str(args.verilator), "--binary", "--timing", "-Wno-fatal",
             "--top-module", "raw_checker_replay_tb", "--Mdir", str(build_dir),
             "-o", tag, str(netlist_v), str(tb),
@@ -69,6 +71,7 @@ def main():
 
         detected_count = 0
         for trace in traces:
+            # Every mutant sees every frozen payload trace under the same timeout.
             name = trace.name.removesuffix(".raw.csv")
             completed = subprocess.run(
                 ["timeout", f"{args.timeout}s", str(executable), "+fault_campaign",

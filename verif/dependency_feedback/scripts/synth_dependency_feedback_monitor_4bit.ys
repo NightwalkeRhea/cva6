@@ -2,11 +2,13 @@ read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_monitor_4bit.
 
 # Synthesize only the four-bit integration candidate.
 hierarchy -check -top dependency_feedback_monitor_4bit
+# Lower always blocks, remove dead logic, then map to generic gates.
 proc
 opt
 flatten
 opt
 synth -top dependency_feedback_monitor_4bit
+# Print cost and reject structural mistakes before saving artifacts.
 stat
 check
 

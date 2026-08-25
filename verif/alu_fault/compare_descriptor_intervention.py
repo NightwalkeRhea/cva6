@@ -8,6 +8,7 @@ from pathlib import Path
 
 
 def detected_by_program(path):
+    """Build one detected-fault set per program from a campaign CSV."""
     sets = {}
     fault_ids = set()
     infrastructure_errors = 0
@@ -22,6 +23,7 @@ def detected_by_program(path):
 
 
 def main():
+    """Compare the ALU descriptor treatment only with its matched control."""
     parser = argparse.ArgumentParser()
     parser.add_argument("baseline_results", type=Path)
     parser.add_argument("intervention_results", type=Path)

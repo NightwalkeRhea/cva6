@@ -10,6 +10,7 @@ from pathlib import Path
 
 
 def parse_arguments():
+    """Collect the two campaign populations and the comparison output path."""
     parser = argparse.ArgumentParser(
         description="Compare mixed and stratified CVA6 ALU mutation campaigns."
     )
@@ -23,11 +24,13 @@ def parse_arguments():
 
 
 def option_value(tokens, option):
+    """Read one option value from a tokenized Yosys mutation command."""
     position = tokens.index(option)
     return tokens[position + 1]
 
 
 def read_results(path):
+    """Load a campaign CSV and reject an empty experiment."""
     with path.open() as input_file:
         rows = list(csv.DictReader(input_file))
 
@@ -42,6 +45,7 @@ def read_results(path):
 
 
 def detected_faults(rows, allowed_faults=None):
+    """Return the union of detected faults, optionally inside one population."""
     result = {
         row["fault_id"]
         for row in rows
@@ -55,6 +59,7 @@ def detected_faults(rows, allowed_faults=None):
 
 
 def program_sets(rows, allowed_faults):
+    """Build the detected-fault set for every program under comparison."""
     result = defaultdict(set)
 
     for row in rows:
@@ -65,6 +70,7 @@ def program_sets(rows, allowed_faults):
 
 
 def mode_map(rows):
+    """Remember which mutation mode belongs to each stable fault ID."""
     result = {}
 
     for row in rows:
@@ -80,6 +86,7 @@ def mode_map(rows):
 
 
 def wilson_interval(detected, total, z=1.959963984540054):
+    """Estimate a binomial coverage interval without a normal approximation."""
     if total == 0:
         return 0.0, 0.0
 
@@ -99,6 +106,7 @@ def wilson_interval(detected, total, z=1.959963984540054):
 
 
 def metric_row(name, faults, detected):
+    """Create one comparable coverage row for a named fault population."""
     count = len(faults)
     detected_count = len(detected & faults)
     low, high = wilson_interval(detected_count, count)
@@ -115,6 +123,7 @@ def metric_row(name, faults, detected):
 
 
 def write_csv(path, fieldnames, rows):
+    """Write a deterministic table used by the research report."""
     with path.open("w", newline="") as output_file:
         writer = csv.DictWriter(output_file, fieldnames=fieldnames)
         writer.writeheader()
@@ -122,6 +131,7 @@ def write_csv(path, fieldnames, rows):
 
 
 def main():
+    """Compare mixed, internal-only, and stratified ALU campaign evidence."""
     args = parse_arguments()
     args.output.mkdir(parents=True, exist_ok=True)
 

@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 def load_counts(path: Path) -> dict[str, int]:
+    """Return comparable counts from one flattened Yosys top module."""
     design = json.loads(path.read_text())
     if len(design["modules"]) != 1:
         raise ValueError(f"Expected one synthesized top module in {path}")
@@ -17,6 +18,7 @@ def load_counts(path: Path) -> dict[str, int]:
 
     # $scopeinfo preserves hierarchy metadata and is not physical hardware.
     hardware_cells = sum(count for kind, count in types.items() if kind != "$scopeinfo")
+    # Any mapped DFF spelling represents retained state; the rest is combinational.
     state_cells = sum(count for kind, count in types.items() if "DFF" in kind)
     return {
         "wires": len(module["netnames"]),
@@ -42,6 +44,7 @@ def main() -> None:
         writer = csv.writer(destination)
         writer.writerow(["metric", "baseline", "monitored", "delta", "delta_percent"])
         for metric in baseline:
+            # Report both the absolute cost and its size relative to the baseline.
             old = baseline[metric]
             new = monitored[metric]
             delta = new - old

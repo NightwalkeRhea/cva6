@@ -1,12 +1,14 @@
 read_verilog -sv verif/dependency_fault/rtl/raw_checker_cv32a65x_wrapper.sv
 
 hierarchy -check -top raw_checker_cv32a65x_wrapper
+# Turn the behavioral priority search into a flat generic-gate netlist.
 proc
 opt
 flatten
 opt
 synth -top raw_checker_cv32a65x_wrapper
 stat
+# Stop if synthesis created an undriven or structurally invalid design.
 check
 
 write_verilog -noattr fi-results/milestone7d-synthesis/raw_checker_cv32a65x_netlist.v

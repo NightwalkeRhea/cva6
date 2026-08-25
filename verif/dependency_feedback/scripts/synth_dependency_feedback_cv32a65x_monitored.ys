@@ -3,6 +3,7 @@ read_verilog -sv verif/dependency_feedback/rtl/dependency_feedback_cv32a65x_pair
 
 # Select the identical RAW cone plus the integrated five-bit accumulator.
 hierarchy -check -top dependency_feedback_cv32a65x_monitored
+# Use the same lowering and mapping sequence as the baseline member.
 proc
 opt
 flatten
@@ -10,6 +11,7 @@ opt
 synth -top dependency_feedback_cv32a65x_monitored
 stat
 check
+# Exclude flip-flops so feedback state does not appear as a false logic loop.
 ltp -noff
 
 write_verilog -noattr fi-results/milestone8fd-synthesis/monitored_netlist.v

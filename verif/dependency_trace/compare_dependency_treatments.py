@@ -32,6 +32,7 @@ def find_nm():
 
 
 def symbol_addresses(nm, elf):
+    """Read the generated-code window from labels embedded in each ELF."""
     symbols = {}
     output = subprocess.check_output([nm, str(elf)], text=True)
     for line in output.splitlines():
@@ -67,8 +68,10 @@ def main():
         start, end = symbol_addresses(nm, elf)
         with trace.open(newline="") as trace_file:
             all_rows = list(csv.DictReader(trace_file))
+        # Exclude common startup and exit code from every treatment comparison.
         rows = [row for row in all_rows if start <= int(row["pc"], 16) < end]
         accepted = [row for row in rows if row["issue_accepted"] == "1"]
+        # Equal accepted-instruction budgets keep the treatments comparable.
         if len(accepted) != 256:
             raise SystemExit(
                 f"{program}: expected 256 accepted payload instructions, "
