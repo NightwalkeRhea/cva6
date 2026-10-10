@@ -200,6 +200,32 @@ module issue_read_operands
   // forwarding signals
   logic [CVA6Cfg.NrIssuePorts-1:0] forward_rs1, forward_rs2, forward_rs3;
 
+`ifndef SYNTHESIS
+  // This tracer only reads CVA6 signals. It never changes core behavior.
+  integer life_trace_fd;
+  integer raw_trace_fd;
+  longint unsigned life_cycle;
+  longint unsigned life_accepted_order;
+  string life_trace_file;
+  string raw_trace_file;
+
+  // These masks retain every scoreboard entry that matches each source.
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.NR_SB_ENTRIES-1:0] life_rs1_matches;
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.NR_SB_ENTRIES-1:0] life_rs2_matches;
+
+  // These fields summarize the producer and source of each operand.
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] life_rs1_producer;
+  logic [CVA6Cfg.NrIssuePorts-1:0][CVA6Cfg.TRANS_ID_BITS-1:0] life_rs2_producer;
+  logic [CVA6Cfg.NrIssuePorts-1:0] life_rs1_found;
+  logic [CVA6Cfg.NrIssuePorts-1:0] life_rs2_found;
+  logic [CVA6Cfg.NrIssuePorts-1:0][3:0] life_rs1_source;
+  logic [CVA6Cfg.NrIssuePorts-1:0][3:0] life_rs2_source;
+
+  // The replay trace stores all destination registers in one packed field.
+  logic [CVA6Cfg.NR_SB_ENTRIES*ariane_pkg::REG_ADDR_SIZE-1:0] life_rd_flat;
+  logic [CVA6Cfg.NR_SB_ENTRIES-1:0] life_rd_fpr;
+`endif
+
   // original instruction
   riscv::instruction_t orig_instr;
   assign orig_instr = riscv::instruction_t'(orig_instr_i[0]);
@@ -966,6 +992,160 @@ module issue_read_operands
       end
     end
   end
+
+`ifndef SYNTHESIS
+  // Open each optional trace only when its plusarg is present.
+  initial begin
+    life_trace_fd = 0;
+    raw_trace_fd = 0;
+    life_cycle = 0;
+    life_accepted_order = 0;
+
+    if ($value$plusargs("dependency_trace_file=%s", life_trace_file)) begin
+      life_trace_fd = $fopen(life_trace_file, "w");
+      if (life_trace_fd == 0) begin
+        $fatal(1, "Cannot open dependency trace file: %s", life_trace_file);
+      end
+      $fdisplay(
+          life_trace_fd,
+          "cycle,issue_port,pc,instruction,consumer_id,fu,operation,rs1,rs2,rs1_has_raw,rs2_has_raw,rs1_producer_id,rs2_producer_id,rs1_ready,rs2_ready,rs1_forwarded,rs2_forwarded,rs1_source,rs2_source,same_cycle_dep_rs1,same_cycle_dep_rs2,same_cycle_bypass_rs1,same_cycle_bypass_rs2,raw_stall_rs1,raw_stall_rs2,structural_stall,external_stall,issue_accepted,flush,accepted_order,operand_a,operand_b,raw_matches_rs1,raw_matches_rs2"
+      );
+    end
+
+    if ($value$plusargs("raw_checker_trace_file=%s", raw_trace_file)) begin
+      raw_trace_fd = $fopen(raw_trace_file, "w");
+      if (raw_trace_fd == 0) begin
+        $fatal(1, "Cannot open RAW trace file: %s", raw_trace_file);
+      end
+      $fdisplay(
+          raw_trace_fd,
+          "cycle,issue_port,operand,pc,rs,rs_fpr,rd_flat,rd_fpr,still_issued,issue_pointer,expected_idx,expected_valid,operand_used"
+      );
+    end
+  end
+
+  // Build observer fields from the live scoreboard entries.
+  always_comb begin : life_story_classify
+    life_rs1_matches = '0;
+    life_rs2_matches = '0;
+    life_rs1_producer = '0;
+    life_rs2_producer = '0;
+    life_rs1_found = '0;
+    life_rs2_found = '0;
+    life_rs1_source = '{default: 4'd0};  // 0 means register file.
+    life_rs2_source = '{default: 4'd0};
+    life_rd_flat = '0;
+    life_rd_fpr = '0;
+
+    for (int unsigned entry = 0; entry < CVA6Cfg.NR_SB_ENTRIES; entry++) begin
+      life_rd_flat[entry*ariane_pkg::REG_ADDR_SIZE+:ariane_pkg::REG_ADDR_SIZE] =
+          fwd_i.sbe[entry].rd;
+      life_rd_fpr[entry] = CVA6Cfg.FpPresent && is_rd_fpr(fwd_i.sbe[entry].op);
+
+      for (int unsigned port = 0; port < CVA6Cfg.NrIssuePorts; port++) begin
+        life_rs1_matches[port][entry] = fwd_i.sbe[entry].valid &&
+            fwd_i.still_issued[entry] && !issue_instr_i[port].use_zimm &&
+            fwd_i.sbe[entry].rd == issue_instr_i[port].rs1 &&
+            life_rd_fpr[entry] == (CVA6Cfg.FpPresent && is_rs1_fpr(issue_instr_i[port].op));
+        life_rs2_matches[port][entry] = fwd_i.sbe[entry].valid &&
+            fwd_i.still_issued[entry] &&
+            fwd_i.sbe[entry].rd == issue_instr_i[port].rs2 &&
+            life_rd_fpr[entry] == (CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[port].op));
+
+        // The first match follows the fixed priority of the forwarding tree.
+        if (life_rs1_matches[port][entry] && !life_rs1_found[port]) begin
+          life_rs1_producer[port] = entry;
+          life_rs1_found[port] = 1'b1;
+        end
+        if (life_rs2_matches[port][entry] && !life_rs2_found[port]) begin
+          life_rs2_producer[port] = entry;
+          life_rs2_found[port] = 1'b1;
+        end
+      end
+    end
+
+    for (int unsigned port = 0; port < CVA6Cfg.NrIssuePorts; port++) begin
+      // 1 means scoreboard forwarding; 8 means the value is not ready.
+      if (rs1_has_raw[port]) life_rs1_source[port] = rs1_valid[port] ? 4'd1 : 4'd8;
+      if (rs2_has_raw[port]) life_rs2_source[port] = rs2_valid[port] ? 4'd1 : 4'd8;
+
+      // These mux choices override a prepared register value.
+      if (issue_instr_i[port].use_pc) life_rs1_source[port] = 4'd9;
+      if (issue_instr_i[port].use_zimm) life_rs1_source[port] = 4'd10;
+      if (issue_instr_i[port].use_imm && issue_instr_i[port].fu != STORE &&
+          issue_instr_i[port].fu != CTRL_FLOW && issue_instr_i[port].fu != ACCEL &&
+          !(CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[port].op))) begin
+        life_rs2_source[port] = 4'd11;
+      end
+    end
+  end
+
+  // Count cycles and accepted instructions without feeding either value back.
+  always_ff @(posedge clk_i or negedge rst_ni) begin : life_story_count
+    if (!rst_ni) begin
+      life_cycle <= 0;
+      life_accepted_order <= 0;
+    end else begin
+      life_cycle <= life_cycle + 1;
+      life_accepted_order <= life_accepted_order +
+          $countones(issue_instr_valid_i & issue_ack_o & {CVA6Cfg.NrIssuePorts{!flush_i}});
+    end
+  end
+
+  // Write one row for every valid attempt, including repeated stall cycles.
+  always_ff @(posedge clk_i) begin : life_story_write
+    if (rst_ni) begin
+      for (int unsigned port = 0; port < CVA6Cfg.NrIssuePorts; port++) begin
+        if (issue_instr_valid_i[port] && life_trace_fd != 0) begin
+          $fdisplay(
+              life_trace_fd,
+              "%0d,%0d,%0h,%0h,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,0,0,0,0,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0h,%0h,%0h,%0h",
+              life_cycle, port, issue_instr_i[port].pc, orig_instr_i[port],
+              issue_instr_i[port].trans_id, issue_instr_i[port].fu,
+              issue_instr_i[port].op, issue_instr_i[port].rs1, issue_instr_i[port].rs2,
+              rs1_has_raw[port], rs2_has_raw[port], life_rs1_producer[port],
+              life_rs2_producer[port], rs1_valid[port], rs2_valid[port],
+              forward_rs1[port], forward_rs2[port], life_rs1_source[port],
+              life_rs2_source[port], rs1_has_raw[port] && !rs1_valid[port],
+              rs2_has_raw[port] && !rs2_valid[port], fu_busy[port], stall_i,
+              issue_ack_o[port], flush_i,
+              issue_ack_o[port] && !flush_i ? life_accepted_order + port + 1 : 0,
+              fu_data_n[port].operand_a, fu_data_n[port].operand_b,
+              life_rs1_matches[port], life_rs2_matches[port]
+          );
+        end
+
+        // Store the inputs and outputs needed to replay each RAW decision.
+        if (issue_instr_valid_i[port] && raw_trace_fd != 0) begin
+          $fdisplay(
+              raw_trace_fd,
+              "%0d,%0d,1,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,%0d",
+              life_cycle, port, issue_instr_i[port].pc, issue_instr_i[port].rs1,
+              CVA6Cfg.FpPresent && is_rs1_fpr(issue_instr_i[port].op), life_rd_flat,
+              life_rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
+              life_rs1_producer[port], rs1_has_raw[port], !issue_instr_i[port].use_zimm
+          );
+          $fdisplay(
+              raw_trace_fd,
+              "%0d,%0d,2,%0h,%0h,%0d,%0h,%0h,%0h,%0h,%0h,%0d,%0d",
+              life_cycle, port, issue_instr_i[port].pc, issue_instr_i[port].rs2,
+              CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[port].op), life_rd_flat,
+              life_rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
+              life_rs2_producer[port], rs2_has_raw[port],
+              !(issue_instr_i[port].use_imm && issue_instr_i[port].fu != STORE &&
+                issue_instr_i[port].fu != CTRL_FLOW && issue_instr_i[port].fu != ACCEL)
+          );
+        end
+      end
+    end
+  end
+
+  // Close each file when simulation ends.
+  final begin
+    if (life_trace_fd != 0) $fclose(life_trace_fd);
+    if (raw_trace_fd != 0) $fclose(raw_trace_fd);
+  end
+`endif
 
   // ----------------------
   // Integer Register File
