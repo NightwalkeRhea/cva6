@@ -1000,8 +1000,6 @@ module issue_read_operands
   initial begin
     life_trace_fd = 0;
     raw_trace_fd = 0;
-    life_cycle = 0;
-    life_accepted_order = 0;
 
     if ($value$plusargs("dependency_trace_file=%s", life_trace_file)) begin
       life_trace_fd = $fopen(life_trace_file, "w");
