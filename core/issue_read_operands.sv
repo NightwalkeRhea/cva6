@@ -200,7 +200,8 @@ module issue_read_operands
   // forwarding signals
   logic [CVA6Cfg.NrIssuePorts-1:0] forward_rs1, forward_rs2, forward_rs3;
 
-`ifndef SYNTHESIS
+  // Keep this passive tracer in RTL simulation, but omit it from synthesis.
+  // synthesis translate_off
   // This tracer only reads CVA6 signals. It never changes core behavior.
   integer life_trace_fd;
   integer raw_trace_fd;
@@ -224,7 +225,7 @@ module issue_read_operands
   // The replay trace stores all destination registers in one packed field.
   logic [CVA6Cfg.NR_SB_ENTRIES*ariane_pkg::REG_ADDR_SIZE-1:0] life_rd_flat;
   logic [CVA6Cfg.NR_SB_ENTRIES-1:0] life_rd_fpr;
-`endif
+  // synthesis translate_on
 
   // original instruction
   riscv::instruction_t orig_instr;
@@ -993,7 +994,8 @@ module issue_read_operands
     end
   end
 
-`ifndef SYNTHESIS
+  // Keep file output and replay checks out of synthesized hardware.
+  // synthesis translate_off
   // Open each optional trace only when its plusarg is present.
   initial begin
     life_trace_fd = 0;
@@ -1145,7 +1147,7 @@ module issue_read_operands
     if (life_trace_fd != 0) $fclose(life_trace_fd);
     if (raw_trace_fd != 0) $fclose(raw_trace_fd);
   end
-`endif
+  // synthesis translate_on
 
   // ----------------------
   // Integer Register File
