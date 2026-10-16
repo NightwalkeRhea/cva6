@@ -248,9 +248,15 @@ module instr_tracer #(
 
 
   initial begin
+    // Z01X rejects ordinary file writes after it injects a fault.
+    // Keep the tracer for normal runs, but let fault campaigns disable it.
+    f = 0;
+    commit_log = 0;
     #15ns;
-    create_file(hart_id_i);
-    trace();
+    if (!$test$plusargs("disable_instr_trace")) begin
+      create_file(hart_id_i);
+      trace();
+    end
   end
 
   final begin
