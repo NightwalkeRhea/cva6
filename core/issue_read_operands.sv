@@ -1008,7 +1008,7 @@ module issue_read_operands
       end
       $fdisplay(
           life_trace_fd,
-          "cycle,issue_port,pc,instruction,consumer_id,fu,operation,rs1,rs2,rs1_has_raw,rs2_has_raw,rs1_producer_id,rs2_producer_id,rs1_ready,rs2_ready,rs1_forwarded,rs2_forwarded,rs1_source,rs2_source,same_cycle_dep_rs1,same_cycle_dep_rs2,same_cycle_bypass_rs1,same_cycle_bypass_rs2,raw_stall_rs1,raw_stall_rs2,structural_stall,external_stall,issue_accepted,flush,accepted_order,operand_a,operand_b,raw_matches_rs1,raw_matches_rs2"
+          "cycle,issue_port,pc,instruction,consumer_id,fu,operation,rs1,rs2,rs1_has_raw,rs2_has_raw,rs1_producer_id,rs2_producer_id,rs1_ready,rs2_ready,rs1_forwarded,rs2_forwarded,rs1_source,rs2_source,same_cycle_dep_rs1,same_cycle_dep_rs2,same_cycle_bypass_rs1,same_cycle_bypass_rs2,raw_stall_rs1,raw_stall_rs2,structural_stall,external_stall,issue_accepted,flush,accepted_order,operand_a,operand_b,raw_matches_rs1,raw_matches_rs2,rs1_producer_valid,rs2_producer_valid"
       );
     end
 
@@ -1024,7 +1024,7 @@ module issue_read_operands
     end
   end
 
-  // Build observer fields from the live scoreboard entries.
+  // Observe the real forwarding requests, including direct writeback.
   always_comb begin : life_story_classify
     life_rs1_matches = '0;
     life_rs2_matches = '0;
@@ -1042,29 +1042,32 @@ module issue_read_operands
           fwd_i.sbe[entry].rd;
       life_rd_fpr[entry] = CVA6Cfg.FpPresent && is_rd_fpr(fwd_i.sbe[entry].op);
 
-      for (int unsigned port = 0; port < CVA6Cfg.NrIssuePorts; port++) begin
-        life_rs1_matches[port][entry] = fwd_i.sbe[entry].valid &&
-            fwd_i.still_issued[entry] && !issue_instr_i[port].use_zimm &&
-            fwd_i.sbe[entry].rd == issue_instr_i[port].rs1 &&
-            life_rd_fpr[entry] == (CVA6Cfg.FpPresent && is_rs1_fpr(issue_instr_i[port].op));
-        life_rs2_matches[port][entry] = fwd_i.sbe[entry].valid &&
-            fwd_i.still_issued[entry] &&
-            fwd_i.sbe[entry].rd == issue_instr_i[port].rs2 &&
-            life_rd_fpr[entry] == (CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[port].op));
-
-        // The first match follows the fixed priority of the forwarding tree.
-        if (life_rs1_matches[port][entry] && !life_rs1_found[port]) begin
-          life_rs1_producer[port] = entry;
-          life_rs1_found[port] = 1'b1;
-        end
-        if (life_rs2_matches[port][entry] && !life_rs2_found[port]) begin
-          life_rs2_producer[port] = entry;
-          life_rs2_found[port] = 1'b1;
-        end
-      end
     end
 
     for (int unsigned port = 0; port < CVA6Cfg.NrIssuePorts; port++) begin
+      // The arbiter selects the lowest request: WB ports first, then entries.
+      for (int unsigned request = 0;
+           request < CVA6Cfg.NrWbPorts + CVA6Cfg.NR_SB_ENTRIES; request++) begin
+        int unsigned entry;
+        if (request < CVA6Cfg.NrWbPorts) entry = fwd_i.wb[request].trans_id;
+        else entry = request - CVA6Cfg.NrWbPorts;
+
+        if ((rs1_fwd_req[port][request] === 1'b1) && !issue_instr_i[port].use_zimm) begin
+          life_rs1_matches[port][entry] = 1'b1;
+          if (!life_rs1_found[port]) begin
+            life_rs1_producer[port] = CVA6Cfg.TRANS_ID_BITS'(entry);
+            life_rs1_found[port] = 1'b1;
+          end
+        end
+        if (rs2_fwd_req[port][request] === 1'b1) begin
+          life_rs2_matches[port][entry] = 1'b1;
+          if (!life_rs2_found[port]) begin
+            life_rs2_producer[port] = CVA6Cfg.TRANS_ID_BITS'(entry);
+            life_rs2_found[port] = 1'b1;
+          end
+        end
+      end
+
       // 1 means scoreboard forwarding; 8 means the value is not ready.
       if (rs1_has_raw[port]) life_rs1_source[port] = rs1_valid[port] ? 4'd1 : 4'd8;
       if (rs2_has_raw[port]) life_rs2_source[port] = rs2_valid[port] ? 4'd1 : 4'd8;
@@ -1099,7 +1102,7 @@ module issue_read_operands
         if (issue_instr_valid_i[port] && life_trace_fd != 0) begin
           $fdisplay(
               life_trace_fd,
-              "%0d,%0d,%0h,%0h,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,0,0,0,0,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0h,%0h,%0h,%0h",
+              "%0d,%0d,%0h,%0h,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,0,0,0,0,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0h,%0h,%0h,%0h,%0d,%0d",
               life_cycle, port, issue_instr_i[port].pc, orig_instr_i[port],
               issue_instr_i[port].trans_id, issue_instr_i[port].fu,
               issue_instr_i[port].op, issue_instr_i[port].rs1, issue_instr_i[port].rs2,
@@ -1111,7 +1114,8 @@ module issue_read_operands
               issue_ack_o[port], flush_i,
               issue_ack_o[port] && !flush_i ? life_accepted_order + port + 1 : 0,
               fu_data_n[port].operand_a, fu_data_n[port].operand_b,
-              life_rs1_matches[port], life_rs2_matches[port]
+              life_rs1_matches[port], life_rs2_matches[port],
+              life_rs1_found[port], life_rs2_found[port]
           );
         end
 
@@ -1123,7 +1127,8 @@ module issue_read_operands
               life_cycle, port, issue_instr_i[port].pc, issue_instr_i[port].rs1,
               CVA6Cfg.FpPresent && is_rs1_fpr(issue_instr_i[port].op), life_rd_flat,
               life_rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
-              life_rs1_producer[port], rs1_has_raw[port], !issue_instr_i[port].use_zimm
+              life_rs1_producer[port], rs1_has_raw[port] && life_rs1_found[port],
+              !issue_instr_i[port].use_zimm
           );
           $fdisplay(
               raw_trace_fd,
@@ -1131,7 +1136,7 @@ module issue_read_operands
               life_cycle, port, issue_instr_i[port].pc, issue_instr_i[port].rs2,
               CVA6Cfg.FpPresent && is_rs2_fpr(issue_instr_i[port].op), life_rd_flat,
               life_rd_fpr, fwd_i.still_issued, fwd_i.issue_pointer,
-              life_rs2_producer[port], rs2_has_raw[port],
+              life_rs2_producer[port], rs2_has_raw[port] && life_rs2_found[port],
               !(issue_instr_i[port].use_imm && issue_instr_i[port].fu != STORE &&
                 issue_instr_i[port].fu != CTRL_FLOW && issue_instr_i[port].fu != ACCEL)
           );
